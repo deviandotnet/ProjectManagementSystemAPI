@@ -4,7 +4,7 @@ using System.Text;
 
 namespace PMS.Domain.Enums
 {
-    public enum TaskStatus
+    public enum ActionItemStatus
     {
         Plan = 0,
         Ongoing = 1,

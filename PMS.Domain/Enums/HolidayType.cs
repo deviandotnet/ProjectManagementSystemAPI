@@ -4,7 +4,7 @@ using System.Text;
 
 namespace PMS.Domain.Enums
 {
-    public enum HolidayTypes
+    public enum HolidayType
     {
         National = 1,
         Company = 2,

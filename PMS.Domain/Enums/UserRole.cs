@@ -8,8 +8,8 @@ namespace PMS.Domain.Enums
     {
         Admin = 1,
         ProjectManager = 2,
-        ProjectLeader = 3,
-        ProjectMember = 4,
-        ProjectViewer = 5
+        TeamLeader = 3,
+        Member = 4,
+        Viewer = 5
     }
 }

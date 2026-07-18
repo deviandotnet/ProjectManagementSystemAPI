@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="PMS.API/PMS.API.csproj" />
+  <Project Path="PMS.Application/PMS.Application.csproj" Id="6a938b9e-bca9-4b48-acc4-c832a0cea1b6" />
+  <Project Path="PMS.Domain/PMS.Domain.csproj" Id="b594e5b1-45c5-4f69-ae9c-d94efc573332" />
+  <Project Path="PMS.Infrastructure/PMS.Infrastructure.csproj" Id="1265a329-6b8f-434a-b874-dee99787de56" />
+</Solution>

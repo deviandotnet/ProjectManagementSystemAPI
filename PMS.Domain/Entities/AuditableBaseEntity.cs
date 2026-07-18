@@ -8,7 +8,7 @@ namespace PMS.Domain.Entities
     {
         public Guid CreatedBy { get; set; }
         public Guid? ModifiedBy { get; set; }
-        public DateTime CreatedOn { get; set; }
+        public DateTimeOffset CreatedOn { get; set; }
         public DateTimeOffset? ModifiedOn { get; set; }
     }
 }

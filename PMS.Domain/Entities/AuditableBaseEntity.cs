@@ -7,7 +7,7 @@ namespace PMS.Domain.Entities
     /// </summary>
     public abstract class AuditableBaseEntity
     {
-        public Guid CreatedByUserId { get; set; }
+        public Guid? CreatedByUserId { get; set; }
         public Guid? UpdatedByUserId { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }

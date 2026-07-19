@@ -1,0 +1,54 @@
+using Microsoft.EntityFrameworkCore;
+using PMS.Domain.Entities;
+using PMS.Infrastructure.Data.Configurations;
+
+namespace PMS.Infrastructure.Data
+{
+    /// <summary>
+    /// EF Core DbContext for the Project Management System.
+    /// 
+    /// Design rules (for AI agents and developers):
+    ///   1. No fluent configuration lives inline here — all configuration is delegated
+    ///      to IEntityTypeConfiguration&lt;T&gt; classes inside the Configurations/ folder.
+    ///   2. Every domain entity that maps to a database table has exactly one DbSet here.
+    ///   3. ApplyConfigurationsFromAssembly() automatically discovers all IEntityTypeConfiguration
+    ///      classes in this assembly — no manual registration needed when you add a new one.
+    /// </summary>
+    public class ApplicationDbContext : DbContext
+    {
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options)
+        {
+        }
+
+        // ── Core Tables ────────────────────────────────────────────────────────────
+        public DbSet<Users> Users => Set<Users>();
+        public DbSet<Project> Projects => Set<Project>();
+        public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+
+        // ── Categorization ─────────────────────────────────────────────────────────
+        public DbSet<Category> Categories => Set<Category>();
+        public DbSet<SubCategory> SubCategories => Set<SubCategory>();
+
+        // ── Action Items & Scheduling ──────────────────────────────────────────────
+        public DbSet<ActionItems> ActionItems => Set<ActionItems>();
+        public DbSet<PlannedSchedule> PlannedSchedules => Set<PlannedSchedule>();
+        public DbSet<ActualExecution> ActualExecutions => Set<ActualExecution>();
+
+        // ── Global / Cross-cutting ─────────────────────────────────────────────────
+        public DbSet<HolidayCalendar> HolidayCalendar => Set<HolidayCalendar>();
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+        // ──────────────────────────────────────────────────────────────────────────
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            // Automatically picks up every IEntityTypeConfiguration<T> class
+            // in this assembly. Adding a new config file is all that's needed.
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+            base.OnModelCreating(modelBuilder);
+        }
+
+    }
+}

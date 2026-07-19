@@ -1,6 +1,6 @@
-using CleanArchitectureTemplates.Domain.Abstractions.Errors;
+using PMS.Domain.Abstractions.Errors;
 
-namespace CleanArchitectureTemplates.Domain.Abstractions
+namespace PMS.Domain.Abstractions
 {
     public class Result
     {

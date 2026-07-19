@@ -1,4 +1,6 @@
-namespace CleanArchitectureTemplates.Domain.Abstractions.Errors;
+using PMS.Domain.Abstractions;
+
+namespace PMS.Domain.Abstractions.Errors;
 
 public record Error(string Code, string? Description = default, ErrorType Type = ErrorType.Failure)
 {

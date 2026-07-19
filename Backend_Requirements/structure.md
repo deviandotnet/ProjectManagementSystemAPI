@@ -22,7 +22,7 @@ This architecture blends the domain safety of **Clean Architecture** with the ma
 ├────────────────────────────────────────────────────────┤
 │                 Vertical Feature Slices                │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │ Feature: CreateTask                              │  │
+│  │ Feature: CreateActionItem                         │  │
 │  │ - Endpoint mapping (app.MapPost)                 │  │
 │  │ - Request/Response DTOs                          │  │
 │  │ - Handler Logic (EF Core Query & DB Save)        │  │
@@ -36,6 +36,8 @@ This architecture blends the domain safety of **Clean Architecture** with the ma
 │  (EF Core DbContext, SQL Migrations, Excel Export)     │
 └────────────────────────────────────────────────────────┘
 ```
+
+*Note: The term "Task" has been renamed to "ActionItem" globally to prevent conflicts with C# `System.Threading.Tasks.Task`.*
 
 ---
 
@@ -68,11 +70,11 @@ ProjectTracker.sln
 │   │   │   │   ├── CreateCategory.cs
 │   │   │   │   └── UpdateCategory.cs
 │   │   │   │
-│   │   │   ├── Tasks/
-│   │   │   │   ├── GetTasksList.cs                  ← Filters, searches, projects DTO
-│   │   │   │   ├── CreateTask.cs
-│   │   │   │   ├── UpdateTask.cs
-│   │   │   │   └── DeleteTask.cs
+│   │   │   ├── ActionItems/
+│   │   │   │   ├── GetActionItemsList.cs            ← Filters, searches, projects DTO
+│   │   │   │   ├── CreateActionItem.cs
+│   │   │   │   ├── UpdateActionItem.cs
+│   │   │   │   └── DeleteActionItem.cs
 │   │   │   │
 │   │   │   └── Timeline/
 │   │   │       └── GetTimelineData.cs               ← Evaluates dynamic status and calendar
@@ -90,14 +92,13 @@ ProjectTracker.sln
 │   │   │   ├── ProjectMember.cs
 │   │   │   ├── Category.cs
 │   │   │   ├── SubCategory.cs
-│   │   │   ├── TaskGroup.cs
-│   │   │   ├── ProjectTask.cs
+│   │   │   ├── ActionItem.cs
 │   │   │   ├── PlannedSchedule.cs
 │   │   │   ├── ActualExecution.cs
 │   │   │   └── AuditLog.cs
 │   │   │
 │   │   ├── Enums/
-│   │   │   ├── TaskStatus.cs
+│   │   │   ├── ActionItemStatus.cs
 │   │   │   ├── ProjectStatus.cs
 │   │   │   ├── UserRole.cs
 │   │   │   ├── Priority.cs
@@ -105,14 +106,14 @@ ProjectTracker.sln
 │   │   │
 │   │   └── Services/                                ← Domain Engines
 │   │       ├── CalendarEngine.cs                    ← Excludes weekends and seed holidays
-│   │       └── StatusEngine.cs                      ← Computes live task status at runtime
+│   │       └── StatusEngine.cs                      ← Computes live status at runtime
 │   │
 │   └── ProjectTracker.Infrastructure/               ← Infrastructure Layer
 │       ├── Data/
 │       │   ├── ApplicationDbContext.cs              ← EF Core DbContext
 │       │   └── Configurations/                      ← Entity Type Configurations
 │       │       ├── ProjectConfiguration.cs
-│       │       └── TaskConfiguration.cs
+│       │       └── ActionItemConfiguration.cs
 │       │
 │       ├── Migrations/                              ← Database migrations
 │       │
@@ -233,10 +234,10 @@ app.Run();
 
 ## Vertical Slice Implementation Example (.NET 10 style)
 
-Here is a full self-contained feature slice located in `ProjectTracker.API/Features/Tasks/CreateTask.cs`. It combines the endpoint mapping, input validation, and execution logic in a single file:
+Here is a full self-contained feature slice located in `ProjectTracker.API/Features/ActionItems/CreateActionItem.cs`. It combines the endpoint mapping, input validation, and execution logic in a single file:
 
 ```csharp
-namespace ProjectTracker.API.Features.Tasks;
+namespace ProjectTracker.API.Features.ActionItems;
 
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -245,14 +246,14 @@ using ProjectTracker.Domain.Entities;
 using ProjectTracker.Infrastructure.Data;
 
 // Feature Slice definition
-public class CreateTask : IEndpointRouteHandler
+public class CreateActionItem : IEndpointRouteHandler
 {
     // Maps the Minimal API route
     public void MapEndpoint(IEndpointRouteBuilder builder)
     {
-        builder.MapPost("projects/{projectId:guid}/tasks", HandleAsync)
-               .WithName("CreateTask")
-               .WithTags("Tasks")
+        builder.MapPost("projects/{projectId:guid}/action-items", HandleAsync)
+               .WithName("CreateActionItem")
+               .WithTags("ActionItems")
                .RequireAuthorization()
                .Produces<Response>(StatusCodes.Status201Created)
                .Produces(StatusCodes.Status400BadRequest);
@@ -260,15 +261,13 @@ public class CreateTask : IEndpointRouteHandler
 
     // Input contracts
     public record Request(
-        string TaskName,
+        string ActionItemName,
         string? Description,
         Guid CategoryId,
         Guid? SubCategoryId,
-        Guid? TaskGroupId,
         int Priority,
         string? OwnerName,
         decimal? Weight,
-        decimal? EstimatedHours,
         string PlannedStartDate, // "YYYY-MM-DD"
         string PlannedEndDate
     );
@@ -276,7 +275,7 @@ public class CreateTask : IEndpointRouteHandler
     // Output contracts
     public record Response(
         Guid Id,
-        string TaskName,
+        string ActionItemName,
         string PlannedStartWeek,
         string PlannedEndWeek,
         int DurationWorkingDays
@@ -287,7 +286,7 @@ public class CreateTask : IEndpointRouteHandler
     {
         public Validator()
         {
-            RuleFor(x => x.TaskName).NotEmpty().MaximumLength(500);
+            RuleFor(x => x.ActionItemName).NotEmpty().MaximumLength(500);
             RuleFor(x => x.CategoryId).NotEmpty();
             RuleFor(x => x.PlannedStartDate).NotEmpty();
             RuleFor(x => x.PlannedEndDate).NotEmpty();
@@ -322,19 +321,17 @@ public class CreateTask : IEndpointRouteHandler
         int workingDays = calendarEngine.CalculateWorkingDays(planStart, planEnd, DayOfWeek.Monday, holidays);
 
         // 4. Instantiate Entities
-        var task = new ProjectTask
+        var actionItem = new ActionItem
         {
             Id = Guid.NewGuid(),
             ProjectId = projectId,
             CategoryId = request.CategoryId,
             SubCategoryId = request.SubCategoryId,
-            TaskGroupId = request.TaskGroupId,
-            TaskName = request.TaskName,
+            ActionItemName = request.ActionItemName,
             Description = request.Description,
             Priority = request.Priority,
             OwnerName = request.OwnerName,
             Weight = request.Weight,
-            EstimatedHours = request.EstimatedHours,
             PlannedSchedule = new PlannedSchedule
             {
                 PlannedStartDate = planStart,
@@ -344,19 +341,19 @@ public class CreateTask : IEndpointRouteHandler
             ActualExecution = new ActualExecution()
         };
 
-        dbContext.Tasks.Add(task);
+        dbContext.ActionItems.Add(actionItem);
         await dbContext.SaveChangesAsync(ct);
 
         // 5. Build DTO Projection manually
         var response = new Response(
-            task.Id,
-            task.TaskName,
+            actionItem.Id,
+            actionItem.ActionItemName,
             $"WW{planStart.DayOfYear / 7:D2}",
             $"WW{planEnd.DayOfYear / 7:D2}",
             workingDays
         );
 
-        return Results.Created($"api/projects/{projectId}/tasks/{task.Id}", response);
+        return Results.Created($"api/projects/{projectId}/action-items/{actionItem.Id}", response);
     }
 }
 ```
@@ -386,9 +383,9 @@ public static async Task<IResult> HandleAsync(
             p.Id,
             p.Name,
             p.Status,
-            p.Tasks.Count,
-            p.Tasks.Count(t => t.ActualExecution != null && t.ActualExecution.ActualEndDate != null),
-            p.Tasks.Count(t => t.ActualExecution == null || t.ActualExecution.ActualEndDate == null 
+            p.ActionItems.Count,
+            p.ActionItems.Count(t => t.ActualExecution != null && t.ActualExecution.ActualEndDate != null),
+            p.ActionItems.Count(t => t.ActualExecution == null || t.ActualExecution.ActualEndDate == null 
                 && t.PlannedSchedule != null && t.PlannedSchedule.PlannedEndDate < DateTime.UtcNow),
             p.ProjectMembers.Where(m => m.UserId == currentUserId).Select(m => (int)m.Role).FirstOrDefault(),
             p.StartDate.ToString("yyyy-MM-dd"),

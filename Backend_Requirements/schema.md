@@ -8,17 +8,19 @@
 
 ## Overview
 
-This schema supports a multi-project environment where each project has its own categories, subcategories, task groups, and tasks. Users are registered with project-level roles. The timeline and status are computed dynamically — they are NOT stored as colors but derived from date logic at runtime.
+This schema supports a multi-project environment where each project has its own categories, subcategories, and action items. Users are registered with project-level roles. The timeline and status are computed dynamically — they are NOT stored as colors but derived from date logic at runtime.
+
+*Note: The term "Task" has been renamed to "ActionItem" globally to prevent conflicts with the C# `System.Threading.Tasks.Task` class.*
 
 ---
 
 ## Enums
 
-### TaskStatus
+### ActionItemStatus
 ```
 0 = Plan            → Gray   (Not started; today < PlannedStart)
 1 = Ongoing         → Green Diagonal Pattern (ActualStart exists, no ActualEnd)
-2 = Delayed         → Red    (Today > PlannedEnd, task incomplete)
+2 = Delayed         → Red    (Today > PlannedEnd, action item incomplete)
 3 = CompletedEarly  → Blue   (ActualEnd < PlannedEnd)
 4 = CompletedOnTime → Green  (ActualEnd <= PlannedEnd)
 5 = CompletedLate   → Yellow (ActualEnd > PlannedEnd)
@@ -26,19 +28,19 @@ This schema supports a multi-project environment where each project has its own 
 
 ### ProjectStatus
 ```
-0 = Active
-1 = OnHold
-2 = Completed
-3 = Cancelled
+1 = Active
+2 = OnHold
+3 = Completed
+4 = Cancelled
 ```
 
 ### UserRole (per project)
 ```
-0 = Admin
-1 = ProjectManager
-2 = TeamLead
-3 = Member
-4 = Viewer
+1 = Admin
+2 = ProjectManager
+3 = TeamLeader
+4 = Member
+5 = Viewer
 ```
 
 ### Priority
@@ -60,7 +62,7 @@ This schema supports a multi-project environment where each project has its own 
 
 ### ProgressMode
 ```
-0 = CountBased    (Completed Tasks / Total Tasks)
+0 = CountBased    (Completed Action Items / Total Action Items)
 1 = WeightBased   (Sum of Weight × Completion %)
 ```
 
@@ -129,7 +131,7 @@ Assigns users to projects with per-project roles.
 ---
 
 ### 4. Categories
-High-level groupings of tasks within a project.
+High-level groupings of action items within a project.
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -157,26 +159,8 @@ Optional second-level grouping under a Category.
 
 ---
 
-### 6. TaskGroups
-Optional visual grouping of tasks (replacing Milestones). Renders as a highlighted header row in the timeline with a background color. Has no dates of its own — purely a label/section divider.
-
-| Column | Type | Constraints |
-|---|---|---|
-| Id | UNIQUEIDENTIFIER | PK |
-| ProjectId | UNIQUEIDENTIFIER | FK → Projects.Id, NOT NULL |
-| CategoryId | UNIQUEIDENTIFIER | FK → Categories.Id, NULL |
-| SubCategoryId | UNIQUEIDENTIFIER | FK → SubCategories.Id, NULL |
-| Name | NVARCHAR(200) | NOT NULL (e.g., "Target Setting Phase 1 - 1st Milestone") |
-| BackgroundColor | NVARCHAR(7) | NOT NULL (Hex, e.g., #FFA500 for orange header rows) |
-| TextColor | NVARCHAR(7) | NULL (Default #FFFFFF) |
-| DisplayOrder | INT | NOT NULL, DEFAULT 0 |
-| CreatedAt | DATETIMEOFFSET | DEFAULT SYSUTCDATETIME() |
-| UpdatedAt | DATETIMEOFFSET | DEFAULT SYSUTCDATETIME() |
-
----
-
-### 7. Tasks
-The core entity. Each row in the timeline grid is one Task (Action Item).
+### 6. ActionItems
+The core entity. Each row in the timeline grid is one Action Item.
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -184,15 +168,12 @@ The core entity. Each row in the timeline grid is one Task (Action Item).
 | ProjectId | UNIQUEIDENTIFIER | FK → Projects.Id, NOT NULL |
 | CategoryId | UNIQUEIDENTIFIER | FK → Categories.Id, NOT NULL |
 | SubCategoryId | UNIQUEIDENTIFIER | FK → SubCategories.Id, NULL |
-| TaskGroupId | UNIQUEIDENTIFIER | FK → TaskGroups.Id, NULL (optional group header) |
-| TaskName | NVARCHAR(500) | NOT NULL |
+| ActionItemName | NVARCHAR(500) | NOT NULL |
 | Description | NVARCHAR(MAX) | NULL |
 | Priority | TINYINT | NOT NULL (Priority enum, Default=1 Medium) |
 | OwnerName | NVARCHAR(200) | NULL (free text or project member name) |
 | OwnerId | UNIQUEIDENTIFIER | FK → Users.Id, NULL (optional link to registered user) |
 | Weight | DECIMAL(5,2) | NULL (used when ProgressMode = WeightBased, 0-100%) |
-| EstimatedHours | DECIMAL(8,2) | NULL |
-| EstimatedCost | DECIMAL(18,2) | NULL |
 | Sequence | INT | NOT NULL, DEFAULT 0 (display order within category/subcategory) |
 | Remarks | NVARCHAR(MAX) | NULL |
 | CreatedByUserId | UNIQUEIDENTIFIER | FK → Users.Id, NULL |
@@ -201,13 +182,13 @@ The core entity. Each row in the timeline grid is one Task (Action Item).
 
 ---
 
-### 8. PlannedSchedules
-Planning data for each task (PLAN columns in Excel).
+### 7. PlannedSchedules
+Planning data for each action item (PLAN columns in Excel).
 
 | Column | Type | Constraints |
 |---|---|---|
 | Id | UNIQUEIDENTIFIER | PK |
-| TaskId | UNIQUEIDENTIFIER | FK → Tasks.Id, UNIQUE (one planned schedule per task) |
+| ActionItemId | UNIQUEIDENTIFIER | FK → ActionItems.Id, UNIQUE (one planned schedule per action item) |
 | PlannedStartDate | DATE | NOT NULL |
 | PlannedEndDate | DATE | NOT NULL |
 | PlannedStartWeek | NVARCHAR(5) | COMPUTED (e.g., WW03) |
@@ -219,20 +200,18 @@ Planning data for each task (PLAN columns in Excel).
 
 ---
 
-### 9. ActualExecutions
+### 8. ActualExecutions
 Tracks the actual execution data (ACTUAL columns in Excel).
 
 | Column | Type | Constraints |
 |---|---|---|
 | Id | UNIQUEIDENTIFIER | PK |
-| TaskId | UNIQUEIDENTIFIER | FK → Tasks.Id, UNIQUE |
+| ActionItemId | UNIQUEIDENTIFIER | FK → ActionItems.Id, UNIQUE |
 | ActualStartDate | DATE | NULL |
 | ActualEndDate | DATE | NULL |
-| CurrentProgressPercent | DECIMAL(5,2) | NULL (0.00 to 100.00) |
 | ActualHours | DECIMAL(8,2) | NULL |
 | CompletedByName | NVARCHAR(200) | NULL |
 | CompletedById | UNIQUEIDENTIFIER | FK → Users.Id, NULL |
-| CompletionDate | DATE | NULL |
 | DelayReason | NVARCHAR(MAX) | NULL |
 | ActualRemarks | NVARCHAR(MAX) | NULL |
 | CreatedAt | DATETIMEOFFSET | DEFAULT SYSUTCDATETIME() |
@@ -240,7 +219,7 @@ Tracks the actual execution data (ACTUAL columns in Excel).
 
 ---
 
-### 10. HolidayCalendar
+### 9. HolidayCalendar
 Stores national (PH) and company holidays. Excludes those dates from Working Days calculation.
 
 | Column | Type | Constraints |
@@ -255,13 +234,13 @@ Stores national (PH) and company holidays. Excludes those dates from Working Day
 
 ---
 
-### 11. AuditLogs
+### 10. AuditLogs
 Captures every change made to any entity in the system (structured log).
 
 | Column | Type | Constraints |
 |---|---|---|
 | Id | BIGINT | PK, IDENTITY(1,1) |
-| EntityName | NVARCHAR(100) | NOT NULL (e.g., "Task", "PlannedSchedule") |
+| EntityName | NVARCHAR(100) | NOT NULL (e.g., "ActionItem", "PlannedSchedule") |
 | EntityId | NVARCHAR(100) | NOT NULL (the GUID of the changed record) |
 | Action | NVARCHAR(50) | NOT NULL ("Create", "Update", "Delete") |
 | FieldName | NVARCHAR(100) | NULL (e.g., "PlannedStartDate") |
@@ -285,12 +264,9 @@ Users
           ├── Categories
           │     └── SubCategories
           │
-          ├── TaskGroups (optional visual group headers)
-          │
-          └── Tasks
+          └── ActionItems
                 ├── (belongs to) Category
                 ├── (belongs to) SubCategory (optional)
-                ├── (belongs to) TaskGroup (optional)
                 ├── PlannedSchedule (1:1)
                 ├── ActualExecution (1:1)
                 └── (linked to) Owner User (optional)

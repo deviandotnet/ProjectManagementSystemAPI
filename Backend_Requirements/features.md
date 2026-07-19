@@ -12,6 +12,8 @@ The backend exposes a RESTful JSON API consumed by the React frontend. Rather th
 
 All business logic (status computation, working days calculation, week number generation, progress calculation) is computed at query time and is **never stored** in the database.
 
+*Note: The term "Task" has been renamed to "ActionItem" globally to prevent conflicts with C# `System.Threading.Tasks.Task`.*
+
 ---
 
 ## Authentication Module
@@ -91,43 +93,27 @@ All business logic (status computation, working days calculation, week number ge
 
 ---
 
-## Task Groups Module
+## Action Items Module
 
-Visual header rows (replacing Milestones). Optional grouping for tasks with a colored label.
-
-### Endpoints
-
-| Method | Route | Description | Min Role |
-|---|---|---|---|
-| GET | /api/projects/{projectId}/taskgroups | List task groups | Member |
-| POST | /api/projects/{projectId}/taskgroups | Create task group | TeamLead |
-| PUT | /api/projects/{projectId}/taskgroups/{id} | Update | TeamLead |
-| DELETE | /api/projects/{projectId}/taskgroups/{id} | Delete | ProjectManager |
-
----
-
-## Tasks Module
-
-Core module. Every row in the timeline is one Task.
+Core module. Every row in the timeline is one Action Item.
 
 ### Endpoints
 
 | Method | Route | Description | Min Role |
 |---|---|---|---|
-| GET | /api/projects/{projectId}/tasks | List all tasks (with status computed) | Member |
-| POST | /api/projects/{projectId}/tasks | Create task | Member |
-| GET | /api/projects/{projectId}/tasks/{id} | Get single task | Member |
-| PUT | /api/projects/{projectId}/tasks/{id} | Update task | Member |
-| DELETE | /api/projects/{projectId}/tasks/{id} | Delete task | TeamLead |
-| PUT | /api/projects/{projectId}/tasks/reorder | Reorder tasks | TeamLead |
-| GET | /api/projects/{projectId}/tasks/{id}/history | Get audit history for task | Member |
+| GET | /api/projects/{projectId}/action-items | List all action items (with status computed) | Member |
+| POST | /api/projects/{projectId}/action-items | Create action item | Member |
+| GET | /api/projects/{projectId}/action-items/{id} | Get single action item | Member |
+| PUT | /api/projects/{projectId}/action-items/{id} | Update action item | Member |
+| DELETE | /api/projects/{projectId}/action-items/{id} | Delete action item | TeamLead |
+| PUT | /api/projects/{projectId}/action-items/reorder | Reorder action items | TeamLead |
+| GET | /api/projects/{projectId}/action-items/{id}/history | Get audit history for action item | Member |
 
-### Query Parameters (GET /tasks)
+### Query Parameters (GET /action-items)
 ```
 ?categoryId=...
 ?subCategoryId=...
-?taskGroupId=...
-?status=0,1,2           (comma-separated TaskStatus values)
+?status=0,1,2           (comma-separated ActionItemStatus values)
 ?priority=2             (Priority enum value)
 ?ownerName=John
 ?search=requirements
@@ -137,17 +123,15 @@ Core module. Every row in the timeline is one Task.
 ?endDate=2026-06-30
 ```
 
-### Task Response DTO (computed fields included)
+### Action Item Response DTO (computed fields included)
 ```json
 {
   "id": "guid",
-  "taskName": "Requirements checking for AI visualization",
+  "actionItemName": "Requirements checking for AI visualization",
   "categoryId": "guid",
   "categoryName": "Project Planning",
   "subCategoryId": "guid",
   "subCategoryName": "Project Planning Details",
-  "taskGroupId": "guid",
-  "taskGroupName": "Target Setting Phase 1",
   "priority": 2,
   "ownerName": "John",
   "sequence": 1,
@@ -162,7 +146,6 @@ Core module. Every row in the timeline is one Task.
   "actualExecution": {
     "actualStartDate": "2026-01-03",
     "actualEndDate": null,
-    "currentProgressPercent": 60.0,
     "actualHours": 12.5,
     "delayReason": null
   },
@@ -210,13 +193,7 @@ The timeline is generated server-side and returned as structured data. The front
       "color": "#3A86FF"
     },
     {
-      "rowType": "TaskGroup",
-      "id": "guid",
-      "label": "Target Setting Phase 1 - 1st Milestone",
-      "backgroundColor": "#FFA500"
-    },
-    {
-      "rowType": "Task",
+      "rowType": "ActionItem",
       "id": "guid",
       "label": "Requirements checking for AI visualization",
       "plannedStartWeekIndex": 0,
@@ -228,20 +205,6 @@ The timeline is generated server-side and returned as structured data. The front
     }
   ]
 }
-```
-
-### Column Generation Algorithm
-```csharp
-// Server-side pseudocode
-GenerateWeekColumns(DateTime projectStart, DateTime projectEnd, DayOfWeek weekStart):
-  columns = []
-  current = GetWeekStart(projectStart, weekStart)
-  weekNumber = GetISOWeekNumber(current)  // or fiscal week
-  while current <= projectEnd:
-    columns.Add({ Label: $"WW{weekNumber:D2}", Start: current, End: current.AddDays(6) })
-    current = current.AddDays(7)
-    weekNumber++
-  return columns
 ```
 
 ---
@@ -284,10 +247,10 @@ The system seeds the following recurring PH national holidays on startup:
 
 ## Status Engine
 
-Status is **never stored in the database**. It is computed in real-time by the `TaskStatusService` in the Domain/Application layer.
+Status is **never stored in the database**. It is computed in real-time by the `ActionItemStatusService` in the Domain/Application layer.
 
 ```csharp
-public static TaskStatus ComputeStatus(
+public static ActionItemStatus ComputeStatus(
     DateTime today,
     DateTime plannedEnd,
     DateTime? actualStart,
@@ -295,13 +258,13 @@ public static TaskStatus ComputeStatus(
 {
     if (actualEnd.HasValue)
     {
-        if (actualEnd < plannedEnd) return TaskStatus.CompletedEarly;
-        if (actualEnd == plannedEnd) return TaskStatus.CompletedOnTime;
-        return TaskStatus.CompletedLate;
+        if (actualEnd < plannedEnd) return ActionItemStatus.CompletedEarly;
+        if (actualEnd == plannedEnd) return ActionItemStatus.CompletedOnTime;
+        return ActionItemStatus.CompletedLate;
     }
-    if (actualStart.HasValue) return TaskStatus.Ongoing;
-    if (today > plannedEnd) return TaskStatus.Delayed;
-    return TaskStatus.Plan;
+    if (actualStart.HasValue) return ActionItemStatus.Ongoing;
+    if (today > plannedEnd) return ActionItemStatus.Delayed;
+    return ActionItemStatus.Plan;
 }
 ```
 
@@ -311,13 +274,13 @@ public static TaskStatus ComputeStatus(
 
 ### Count-Based (Default)
 ```
-ProjectProgress = (CompletedTasks / TotalTasks) × 100
-CompletedTasks = Tasks where Status in (CompletedEarly, CompletedOnTime, CompletedLate)
+ProjectProgress = (CompletedActionItems / TotalActionItems) × 100
+CompletedActionItems = ActionItems where ActualEndDate IS NOT NULL
 ```
 
 ### Weight-Based (Optional, set per project)
 ```
-ProjectProgress = SUM(Task.Weight × Task.CurrentProgressPercent)
+ProjectProgress = SUM(ActionItem.Weight × (ActionItem.ActualEndDate != null ? 100 : 0))
 ```
 
 ### Endpoint
@@ -347,11 +310,11 @@ Returns a card-based summary for each project the current user belongs to. Each 
       "projectName": "AI Visualization NG Prediction",
       "status": "Active",
       "progressPercent": 42.5,
-      "totalTasks": 80,
-      "completedTasks": 34,
-      "ongoingTasks": 20,
-      "delayedTasks": 6,
-      "plannedTasks": 20,
+      "totalActionItems": 80,
+      "completedActionItems": 34,
+      "ongoingActionItems": 20,
+      "delayedActionItems": 6,
+      "plannedActionItems": 20,
       "startDate": "2026-01-03",
       "endDate": "2026-11-06",
       "myRole": "ProjectManager"
@@ -364,13 +327,12 @@ Returns a card-based summary for each project the current user belongs to. Each 
 
 ## Filters & Search Module
 
-Applied as query parameters on `/api/projects/{projectId}/tasks`.
+Applied as query parameters on `/api/projects/{projectId}/action-items`.
 
 ### Filter Options
 ```
 ?categoryId=        Filter by Category
 ?subCategoryId=     Filter by SubCategory
-?taskGroupId=       Filter by Task Group
 ?status=            Filter by Status (comma-separated)
 ?priority=          Filter by Priority
 ?ownerName=         Filter by Owner Name
@@ -378,7 +340,7 @@ Applied as query parameters on `/api/projects/{projectId}/tasks`.
 ?weekEnd=WW52       Filter up to this week
 ?startDate=         Filter by planned start date >=
 ?endDate=           Filter by planned end date <=
-?search=            Full-text search across TaskName, Description, OwnerName
+?search=            Full-text search across ActionItemName, Description, OwnerName
 ```
 
 ---
@@ -393,7 +355,7 @@ Applied as query parameters on `/api/projects/{projectId}/tasks`.
 
 ### Excel Export Contents
 The exported Excel file mirrors the original spreadsheet format:
-- **Sheet 1:** Task list with Category, SubCategory, Task Name, Plan Start, Plan End, Actual Start, Actual End, Duration, Status, Progress%
+- **Sheet 1:** Action item list with Category, SubCategory, Action Item Name, Plan Start, Plan End, Actual Start, Actual End, Duration, Status
 - **Sheet 2:** Timeline view with colored cells matching the Status Engine color rules
 - **Library:** ClosedXML
 
@@ -406,7 +368,7 @@ The exported Excel file mirrors the original spreadsheet format:
 | Method | Route | Description | Min Role |
 |---|---|---|---|
 | GET | /api/projects/{projectId}/audit | Get audit logs for project | TeamLead |
-| GET | /api/projects/{projectId}/tasks/{taskId}/audit | Get audit logs for task | Member |
+| GET | /api/projects/{projectId}/action-items/{actionItemId}/audit | Get audit logs for action item | Member |
 
 ### Activity Feed Format
 Human-readable format returned alongside raw audit log:
@@ -416,7 +378,7 @@ Human-readable format returned alongside raw audit log:
 
 ## SignalR (Real-Time Collaboration) — Future Phase
 
-> SignalR hub (`/hubs/project`) will broadcast task updates in real time when multiple users are viewing the same project. This is marked for a **future phase**.
+> SignalR hub (`/hubs/project`) will broadcast action item updates in real time when multiple users are viewing the same project. This is marked for a **future phase**.
 
 ---
 

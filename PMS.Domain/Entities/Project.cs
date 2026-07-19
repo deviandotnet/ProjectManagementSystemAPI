@@ -1,17 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using PMS.Domain.Enums;
 
 namespace PMS.Domain.Entities
 {
+    /// <summary>
+    /// Top-level entity. Each project is independent with its own calendar and timeline settings.
+    /// One project has many: Categories, ProjectMembers, ActionItems.
+    /// </summary>
     public class Project : AuditableBaseEntity
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
-        public DateTimeOffset StartDate { get; set; }
-        public DateTimeOffset EndDate { get; set; }
-        public int WeekStartDay { get; set; } // (0=Sun to 6=Sat, Default=1 for Monday)
-        public int DefaultTimelineScale { get; set; } // (TimelineScale enum, Default=1 Weekly)
+        public DateOnly StartDate { get; set; }
+        public DateOnly EndDate { get; set; }
+
+        /// <summary>0=Sunday to 6=Saturday. Default=1 (Monday). Affects all timeline column generation.</summary>
+        public int WeekStartDay { get; set; } = 1;
+
+        public TimelineScale DefaultTimelineScale { get; set; } = TimelineScale.Weekly;
+        public ProgressMode ProgressMode { get; set; } = ProgressMode.CountBased;
+        public ProjectStatus Status { get; set; } = ProjectStatus.Active;
+
+        // Navigation Properties
+        public virtual ICollection<Category> Categories { get; set; } = new List<Category>();
+        public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = new List<ProjectMember>();
+        public virtual ICollection<ActionItems> ActionItems { get; set; } = new List<ActionItems>();
     }
 }

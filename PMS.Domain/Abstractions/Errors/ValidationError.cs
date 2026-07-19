@@ -1,4 +1,6 @@
-namespace CleanArchitectureTemplates.Domain.Abstractions.Errors;
+using PMS.Domain.Abstractions;
+
+namespace PMS.Domain.Abstractions.Errors;
 
 public sealed record ValidationError : Error
 {

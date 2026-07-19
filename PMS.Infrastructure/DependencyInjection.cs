@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PMS.Application.Abstractions.Data;
 using PMS.Infrastructure.Data;
 using PMS.Infrastructure.Interceptors;
+using PMS.Infrastructure.Repository;
 
 namespace PMS.Infrastructure
 {
@@ -20,8 +22,8 @@ namespace PMS.Infrastructure
                 options.UseSqlServer(configuration.GetConnectionString("DbConnection"));
             });
 
-            //services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-            //services.AddScoped<IUnitOfWork, UnitOfWork>();
+            services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             return services;
         }

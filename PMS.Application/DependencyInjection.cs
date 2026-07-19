@@ -1,6 +1,6 @@
 ﻿namespace PMS.Application
 {
-    public class Class1
+    public static class DependencyInjection
     {
 
     }

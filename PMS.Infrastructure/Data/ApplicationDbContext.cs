@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PMS.Application.Abstractions.Data;
 using PMS.Domain.Entities;
 using PMS.Infrastructure.Data.Configurations;
 
@@ -14,7 +15,7 @@ namespace PMS.Infrastructure.Data
     ///   3. ApplyConfigurationsFromAssembly() automatically discovers all IEntityTypeConfiguration
     ///      classes in this assembly — no manual registration needed when you add a new one.
     /// </summary>
-    public class ApplicationDbContext : DbContext
+    public class ApplicationDbContext : DbContext, IApplicationDbContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)

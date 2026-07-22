@@ -1,6 +1,9 @@
+
+using Microsoft.AspNetCore.Builder;
+
 namespace PMS.Application.Abstractions;
 
 public interface IApiEndpoint
 {
-    //void MapEndpoint(WebApplication app);
+    void MapEndpoint(WebApplication app);
 }

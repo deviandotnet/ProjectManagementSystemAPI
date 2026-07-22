@@ -22,8 +22,13 @@ namespace PMS.Infrastructure
                 options.UseSqlServer(configuration.GetConnectionString("DbConnection"));
             });
 
+            // Register the interface so handlers can inject IApplicationDbContext
+            services.AddScoped<IApplicationDbContext>(sp =>
+                sp.GetRequiredService<ApplicationDbContext>());
+
             services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+            services.AddSingleton<PMS.Application.Abstractions.Authentication.IPasswordHasher, Authentication.PasswordHasher>();
 
             return services;
         }

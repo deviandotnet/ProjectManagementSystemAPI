@@ -21,7 +21,7 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.HasKey(h => h.Id);
 
             builder.Property(h => h.Id)
-                .HasDefaultValueSql("NEWID()");
+                .HasDefaultValueSql("gen_random_uuid()");
 
             // DateOnly → SQL DATE — no time component for a holiday date
             builder.Property(h => h.HolidayDate)
@@ -44,7 +44,7 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.Property(h => h.Year);
 
             builder.Property(h => h.CreatedAt)
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             // Prevent duplicate holiday entries for the same date and year combination
             builder.HasIndex(h => new { h.HolidayDate, h.Year })

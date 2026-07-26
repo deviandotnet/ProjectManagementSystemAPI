@@ -19,7 +19,7 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.HasKey(pm => pm.Id);
 
             builder.Property(pm => pm.Id)
-                .HasDefaultValueSql("NEWID()");
+                .HasDefaultValueSql("gen_random_uuid()");
 
             // Enum stored as tinyint
             builder.Property(pm => pm.Role)
@@ -28,7 +28,7 @@ namespace PMS.Infrastructure.Data.Configurations
 
             builder.Property(pm => pm.JoinedAt)
                 .IsRequired()
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             // Composite unique index: one user can only appear once per project
             builder.HasIndex(pm => new { pm.ProjectId, pm.UserId })
@@ -36,7 +36,7 @@ namespace PMS.Infrastructure.Data.Configurations
 
             // ── Audit columns ──────────────────────────────────────────────────────
             builder.Property(pm => pm.CreatedAt)
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             builder.Property(pm => pm.UpdatedAt);
 

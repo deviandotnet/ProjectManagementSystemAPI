@@ -20,7 +20,7 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.HasKey(ps => ps.Id);
 
             builder.Property(ps => ps.Id)
-                .HasDefaultValueSql("NEWID()");
+                .HasDefaultValueSql("gen_random_uuid()");
 
             // Enforce 1:1 — only one PlannedSchedule per ActionItem allowed
             builder.HasIndex(ps => ps.ActionItemId)
@@ -51,7 +51,7 @@ namespace PMS.Infrastructure.Data.Configurations
                 .IsRequired();
 
             builder.Property(ps => ps.CreatedAt)
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             builder.Property(ps => ps.UpdatedAt);
 

@@ -10,6 +10,9 @@ namespace PMS.API
     {
         public static void Main(string[] args)
         {
+            // Load environment variables from local .env file if present
+            DotNetEnv.Env.TraversePath().Load();
+
             var builder = WebApplication.CreateBuilder(args);
 
             // ── Application (Handlers + Validators + Endpoints) ────────────────────

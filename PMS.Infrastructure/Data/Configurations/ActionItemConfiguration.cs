@@ -20,7 +20,7 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.HasKey(ai => ai.Id);
 
             builder.Property(ai => ai.Id)
-                .HasDefaultValueSql("NEWID()");
+                .HasDefaultValueSql("gen_random_uuid()");
 
             builder.Property(ai => ai.ActionItemName)
                 .IsRequired()
@@ -46,14 +46,14 @@ namespace PMS.Infrastructure.Data.Configurations
                 .HasDefaultValue(0);
 
             builder.Property(ai => ai.Remarks)
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
 
             // ── Audit columns ──────────────────────────────────────────────────────
             builder.Property(ai => ai.CreatedByUserId)
                 .IsRequired(false); // Nullable — may be set by system/seeder
 
             builder.Property(ai => ai.CreatedAt)
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             builder.Property(ai => ai.UpdatedAt);
 

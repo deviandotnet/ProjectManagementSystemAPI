@@ -17,7 +17,7 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.HasKey(u => u.Id);
 
             builder.Property(u => u.Id)
-                .HasDefaultValueSql("NEWID()");
+                .HasDefaultValueSql("gen_random_uuid()");
 
             builder.Property(u => u.FirstName)
                 .IsRequired()
@@ -46,7 +46,7 @@ namespace PMS.Infrastructure.Data.Configurations
 
             // ── Audit columns ──────────────────────────────────────────────────────
             builder.Property(u => u.CreatedAt)
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             builder.Property(u => u.UpdatedAt);
 

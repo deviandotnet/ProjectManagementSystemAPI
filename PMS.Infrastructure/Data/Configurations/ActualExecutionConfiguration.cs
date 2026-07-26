@@ -19,7 +19,7 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.HasKey(ae => ae.Id);
 
             builder.Property(ae => ae.Id)
-                .HasDefaultValueSql("NEWID()");
+                .HasDefaultValueSql("gen_random_uuid()");
 
             // Enforce 1:1 — only one ActualExecution per ActionItem allowed
             builder.HasIndex(ae => ae.ActionItemId)
@@ -39,13 +39,13 @@ namespace PMS.Infrastructure.Data.Configurations
                 .HasMaxLength(200);
 
             builder.Property(ae => ae.DelayReason)
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
 
             builder.Property(ae => ae.ActualRemarks)
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
 
             builder.Property(ae => ae.CreatedAt)
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             builder.Property(ae => ae.UpdatedAt);
 

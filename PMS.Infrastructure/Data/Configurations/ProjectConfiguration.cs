@@ -18,14 +18,14 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.HasKey(p => p.Id);
 
             builder.Property(p => p.Id)
-                .HasDefaultValueSql("NEWID()");
+                .HasDefaultValueSql("gen_random_uuid()");
 
             builder.Property(p => p.Name)
                 .IsRequired()
                 .HasMaxLength(200);
 
             builder.Property(p => p.Description)
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
 
             // DateOnly maps to SQL DATE — no time portion stored
             builder.Property(p => p.StartDate)
@@ -62,7 +62,7 @@ namespace PMS.Infrastructure.Data.Configurations
                 .IsRequired();
 
             builder.Property(p => p.CreatedAt)
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             builder.Property(p => p.UpdatedAt);
 

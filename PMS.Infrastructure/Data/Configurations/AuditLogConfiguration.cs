@@ -20,7 +20,7 @@ namespace PMS.Infrastructure.Data.Configurations
             builder.HasKey(al => al.Id);
 
             builder.Property(al => al.Id)
-                .UseIdentityColumn(); // BIGINT IDENTITY(1,1)
+                .UseIdentityAlwaysColumn(); // BIGINT IDENTITY
 
             builder.Property(al => al.EntityName)
                 .IsRequired()
@@ -39,10 +39,10 @@ namespace PMS.Infrastructure.Data.Configurations
                 .HasMaxLength(100);
 
             builder.Property(al => al.OldValue)
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
 
             builder.Property(al => al.NewValue)
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
 
             // Denormalized name — avoids joins on every audit feed query
             builder.Property(al => al.ChangedByName)
@@ -53,7 +53,7 @@ namespace PMS.Infrastructure.Data.Configurations
 
             builder.Property(al => al.ChangedAt)
                 .IsRequired()
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .HasDefaultValueSql("now() at time zone 'utc'");
 
             // ── Indexes for common query patterns ─────────────────────────────────
             // Most common: "show all changes for this specific record"

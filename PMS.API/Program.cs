@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using PMS.Application;
 using PMS.Application.Extensions;
 using PMS.Infrastructure;
@@ -23,12 +24,16 @@ namespace PMS.API
 
             var app = builder.Build();
 
-            // ── Middleware Pipeline ────────────────────────────────────────────────
-            if (app.Environment.IsDevelopment())
+            // ── Auto-Migrate Database on Cloud Startup ─────────────────────────────
+            using (var scope = app.Services.CreateScope())
             {
-                app.MapOpenApi();
-                app.MapScalarApiReference();
+                var dbContext = scope.ServiceProvider.GetRequiredService<PMS.Infrastructure.Data.ApplicationDbContext>();
+                dbContext.Database.Migrate();
             }
+
+            // ── Middleware Pipeline ────────────────────────────────────────────────
+            app.MapOpenApi();
+            app.MapScalarApiReference();
 
             app.UseHttpsRedirection();
             app.UseAuthorization();

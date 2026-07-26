@@ -19,7 +19,19 @@ namespace PMS.Infrastructure
             services.AddDbContext<ApplicationDbContext>((sp, options) =>
             {
                 options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
-                options.UseSqlServer(configuration.GetConnectionString("DbConnection"));
+                
+                var provider = configuration["DbProvider"] ?? "SqlServer";
+                var connectionString = configuration.GetConnectionString("DbConnection");
+
+                if (provider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase) || 
+                    provider.Equals("Npgsql", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.UseNpgsql(connectionString);
+                }
+                else
+                {
+                    options.UseSqlServer(connectionString);
+                }
             });
 
             // Register the interface so handlers can inject IApplicationDbContext

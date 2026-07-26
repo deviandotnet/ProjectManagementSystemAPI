@@ -16,6 +16,7 @@ namespace PMS.Application.Features.UserFeatures.CreateUser;
 /// </summary>
 public sealed class CreateUserHandler(
     IApplicationDbContext dbContext,
+    IRepository<Users> repository,
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher)
     : IHandler<CreateUserRequest, Result<CreateUserResponse>>
@@ -46,8 +47,8 @@ public sealed class CreateUserHandler(
             CreatedByUserId = command.CreatedByUserId
         };
 
-        // 3. Persist entity
-        await dbContext.Users.AddAsync(user, cancellationToken);
+        // 3. Persist entity via IRepository (write abstraction)
+        await repository.AddAsync(user, cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
 
         // 4. Map to response (excluding PasswordHash for security)

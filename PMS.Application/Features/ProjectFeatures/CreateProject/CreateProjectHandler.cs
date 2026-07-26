@@ -16,6 +16,7 @@ namespace PMS.Application.Features.ProjectFeatures.CreateProject;
 /// </summary>
 public sealed class CreateProjectHandler(
     IApplicationDbContext dbContext,
+    IRepository<Project> repository,
     IUnitOfWork unitOfWork)
     : IHandler<CreateProjectRequest, Result<CreateProjectResponse>>
 {
@@ -47,8 +48,8 @@ public sealed class CreateProjectHandler(
             CreatedByUserId = command.CreatedByUserId
         };
 
-        // 3. Persist entity
-        await dbContext.Projects.AddAsync(project, cancellationToken);
+        // 3. Persist entity via IRepository (write abstraction)
+        await repository.AddAsync(project, cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
 
         // 4. Map to response

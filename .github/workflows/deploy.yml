@@ -1,0 +1,43 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore ProjectManagementSystemAPI.slnx
+
+    - name: Build solution
+      run: dotnet build ProjectManagementSystemAPI.slnx --no-restore -c Release
+
+    - name: Run Unit Tests
+      run: dotnet test ProjectManagementSystemAPI.slnx --no-build -c Release --verbosity normal
+
+  deploy:
+    name: Deploy to Production Cloud (Render)
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Trigger Deploy Hook on Render
+      run: |
+        if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+        else
+          echo "RENDER_DEPLOY_HOOK_URL secret is not set yet. Skipping automatic trigger."
+        fi

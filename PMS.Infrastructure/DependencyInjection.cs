@@ -19,8 +19,7 @@ namespace PMS.Infrastructure
             services.AddDbContext<ApplicationDbContext>((sp, options) =>
             {
                 options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
-
-                options.UseNpgsql(configuration.GetConnectionString("DbConnection"));
+                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
 
             });
 

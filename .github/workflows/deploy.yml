@@ -26,9 +26,6 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore ProjectManagementSystemAPI.slnx
 
-    - name: Clean Solution
-      run: dotnet clean ProjectManagementSystemAPI.slnx
-
     - name: Build solution
       run: dotnet build ProjectManagementSystemAPI.slnx --no-restore -c Release
 

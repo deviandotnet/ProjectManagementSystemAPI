@@ -1,0 +1,45 @@
+name: RENDER CI/CD Pipeline
+
+on:
+  workflow_dispatch: 
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  DOTNET_VERSION: "10.0.x"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION}}
+
+    - name: Restore dependencies
+      run: dotnet restore ProjectManagementSystemAPI.slnx
+
+    - name: Build solution
+      run: dotnet build ProjectManagementSystemAPI.slnx --no-restore -c Release
+
+    - name: Run Unit Tests
+      run: dotnet test ProjectManagementSystemAPI.slnx --no-build -c Release --verbosity normal
+
+  deploy:
+    name: Deploy to Production Cloud (Render)
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}

@@ -1,18 +1,19 @@
+using Bogus;
 using FluentAssertions;
 using PMS.Application.Features.ProjectFeatures;
 using PMS.Application.Features.ProjectFeatures.GetProjectById;
 using PMS.Domain.Entities;
 using PMS.Domain.Enums;
 using PMS.Infrastructure.Data;
-using PMS.UnitTests.Helpers;
-using Xunit;
+using PMS.IntegrationTests.Helpers;
 
-namespace PMS.UnitTests.ProjectFeatures;
+namespace PMS.IntegrationTests.ProjectFeatures;
 
 public class GetProjectByIdHandlerTests
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly GetProjectByIdHandler _handler;
+    private readonly Faker _faker = new();
 
     public GetProjectByIdHandlerTests()
     {
@@ -27,14 +28,18 @@ public class GetProjectByIdHandlerTests
         var projectId = Guid.NewGuid();
         var createdByUserId = Guid.NewGuid();
         var createdAt = DateTimeOffset.UtcNow;
+        var projectName = _faker.Commerce.ProductName();
+        var projectDescription = _faker.Lorem.Sentence();
+        var startDate = new DateOnly(2025, 3, 1);
+        var endDate = new DateOnly(2025, 11, 30);
 
         var projectEntity = new Project
         {
             Id = projectId,
-            Name = "Apollo Project",
-            Description = "Moon mission project",
-            StartDate = new DateOnly(2025, 3, 1),
-            EndDate = new DateOnly(2025, 11, 30),
+            Name = projectName,
+            Description = projectDescription,
+            StartDate = startDate,
+            EndDate = endDate,
             WeekStartDay = 1,
             DefaultTimelineScale = TimelineScale.Monthly,
             ProgressMode = ProgressMode.CountBased,
@@ -55,10 +60,10 @@ public class GetProjectByIdHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
         result.Value.Id.Should().Be(projectId);
-        result.Value.Name.Should().Be("Apollo Project");
-        result.Value.Description.Should().Be("Moon mission project");
-        result.Value.StartDate.Should().Be(new DateOnly(2025, 3, 1));
-        result.Value.EndDate.Should().Be(new DateOnly(2025, 11, 30));
+        result.Value.Name.Should().Be(projectName);
+        result.Value.Description.Should().Be(projectDescription);
+        result.Value.StartDate.Should().Be(startDate);
+        result.Value.EndDate.Should().Be(endDate);
         result.Value.WeekStartDay.Should().Be(1);
         result.Value.DefaultTimelineScale.Should().Be("Monthly");
         result.Value.ProgressMode.Should().Be("CountBased");

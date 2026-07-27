@@ -1,3 +1,4 @@
+using Bogus;
 using FluentAssertions;
 using NSubstitute;
 using PMS.Application.Abstractions.Authentication;
@@ -6,9 +7,9 @@ using PMS.Application.Features.UserFeatures;
 using PMS.Application.Features.UserFeatures.CreateUser;
 using PMS.Domain.Entities;
 using PMS.Infrastructure.Data;
-using PMS.UnitTests.Helpers;
+using PMS.IntegrationTests.Helpers;
 
-namespace PMS.UnitTests.UserFeatures;
+namespace PMS.IntegrationTests.UserFeatures;
 
 public class CreateUserHandlerTests
 {
@@ -17,6 +18,7 @@ public class CreateUserHandlerTests
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly CreateUserHandler _handler;
+    private readonly Faker _faker = new();
 
     public CreateUserHandlerTests()
     {
@@ -39,12 +41,18 @@ public class CreateUserHandlerTests
     {
         // Arrange
         var createdByUserId = Guid.NewGuid();
+        var firstName = _faker.Name.FirstName();
+        var middleName = _faker.Name.FirstName();
+        var lastName = _faker.Name.LastName();
+        var email = _faker.Internet.Email();
+        var password = _faker.Internet.Password(length: 12);
+
         var command = new CreateUserRequest(
-            FirstName: "John",
-            MiddleName: "Alexander",
-            LastName: "Doe",
-            Email: "john.doe@example.com",
-            Password: "SecurePassword123!",
+            FirstName: firstName,
+            MiddleName: middleName,
+            LastName: lastName,
+            Email: email,
+            Password: password,
             CreatedByUserId: createdByUserId
         );
 
@@ -55,21 +63,21 @@ public class CreateUserHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
         result.Value.Id.Should().NotBeEmpty();
-        result.Value.FirstName.Should().Be("John");
-        result.Value.MiddleName.Should().Be("Alexander");
-        result.Value.LastName.Should().Be("Doe");
-        result.Value.Email.Should().Be("john.doe@example.com");
+        result.Value.FirstName.Should().Be(firstName);
+        result.Value.MiddleName.Should().Be(middleName);
+        result.Value.LastName.Should().Be(lastName);
+        result.Value.Email.Should().Be(email.ToLowerInvariant());
         result.Value.IsActive.Should().BeTrue();
         result.Value.CreatedByUserId.Should().Be(createdByUserId);
 
-        _passwordHasher.Received(1).Hash("SecurePassword123!");
+        _passwordHasher.Received(1).Hash(password);
         await _repository.Received(1).AddAsync(
             Arg.Is<Users>(u =>
-                u.FirstName == "John" &&
-                u.MiddleName == "Alexander" &&
-                u.LastName == "Doe" &&
-                u.Email == "john.doe@example.com" &&
-                u.PasswordHash == "hashed_SecurePassword123!" &&
+                u.FirstName == firstName &&
+                u.MiddleName == middleName &&
+                u.LastName == lastName &&
+                u.Email == email.ToLowerInvariant() &&
+                u.PasswordHash == $"hashed_{password}" &&
                 u.IsActive &&
                 u.CreatedByUserId == createdByUserId
             ),
@@ -81,12 +89,17 @@ public class CreateUserHandlerTests
     public async Task HandleAsync_WithNullMiddleNameAndNullCreatedByUserId_ShouldCreateUserWithDefaults()
     {
         // Arrange
+        var firstName = _faker.Name.FirstName();
+        var lastName = _faker.Name.LastName();
+        var email = _faker.Internet.Email();
+        var password = _faker.Internet.Password(length: 12);
+
         var command = new CreateUserRequest(
-            FirstName: "Jane",
+            FirstName: firstName,
             MiddleName: null,
-            LastName: "Smith",
-            Email: "jane.smith@example.com",
-            Password: "AnotherPassword123!"
+            LastName: lastName,
+            Email: email,
+            Password: password
         );
 
         // Act
@@ -107,24 +120,24 @@ public class CreateUserHandlerTests
     public async Task HandleAsync_WhenEmailAlreadyExists_ShouldReturnConflictError()
     {
         // Arrange
-        var existingEmail = "existing.user@example.com";
+        var existingEmail = _faker.Internet.Email();
         _dbContext.Users.Add(new Users
         {
             Id = Guid.NewGuid(),
-            FirstName = "Existing",
-            LastName = "User",
+            FirstName = _faker.Name.FirstName(),
+            LastName = _faker.Name.LastName(),
             Email = existingEmail,
-            PasswordHash = "hashed_pass",
+            PasswordHash = _faker.Random.Hash(),
             IsActive = true
         });
         await _dbContext.SaveChangesAsync();
 
         var command = new CreateUserRequest(
-            FirstName: "New",
+            FirstName: _faker.Name.FirstName(),
             MiddleName: null,
-            LastName: "User",
+            LastName: _faker.Name.LastName(),
             Email: existingEmail,
-            Password: "Password123!"
+            Password: _faker.Internet.Password(length: 12)
         );
 
         // Act
@@ -144,23 +157,24 @@ public class CreateUserHandlerTests
     public async Task HandleAsync_WhenEmailMatchesCaseInsensitively_ShouldReturnConflictError()
     {
         // Arrange
+        var existingEmail = _faker.Internet.Email().ToLowerInvariant();
         _dbContext.Users.Add(new Users
         {
             Id = Guid.NewGuid(),
-            FirstName = "Existing",
-            LastName = "User",
-            Email = "user.test@domain.com",
-            PasswordHash = "hashed_pass",
+            FirstName = _faker.Name.FirstName(),
+            LastName = _faker.Name.LastName(),
+            Email = existingEmail,
+            PasswordHash = _faker.Random.Hash(),
             IsActive = true
         });
         await _dbContext.SaveChangesAsync();
 
         var command = new CreateUserRequest(
-            FirstName: "Duplicate",
+            FirstName: _faker.Name.FirstName(),
             MiddleName: null,
-            LastName: "Test",
-            Email: "USER.TEST@DOMAIN.COM",
-            Password: "Password123!"
+            LastName: _faker.Name.LastName(),
+            Email: existingEmail.ToUpperInvariant(),
+            Password: _faker.Internet.Password(length: 12)
         );
 
         // Act

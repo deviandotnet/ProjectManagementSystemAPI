@@ -1,17 +1,18 @@
+using Bogus;
 using FluentAssertions;
 using PMS.Application.Features.ProjectFeatures.GetAllProjects;
 using PMS.Domain.Entities;
 using PMS.Domain.Enums;
 using PMS.Infrastructure.Data;
-using PMS.UnitTests.Helpers;
-using Xunit;
+using PMS.IntegrationTests.Helpers;
 
-namespace PMS.UnitTests.ProjectFeatures;
+namespace PMS.IntegrationTests.ProjectFeatures;
 
 public class GetAllProjectsHandlerTests
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly GetAllProjectsHandler _handler;
+    private readonly Faker _faker = new();
 
     public GetAllProjectsHandlerTests()
     {
@@ -24,12 +25,17 @@ public class GetAllProjectsHandlerTests
     {
         // Arrange
         var createdByUserId = Guid.NewGuid();
+        var nameAlpha = _faker.Commerce.ProductName();
+        var descAlpha = _faker.Lorem.Sentence();
+        var nameBeta = _faker.Commerce.ProductName();
+        var descBeta = _faker.Lorem.Sentence();
+
         _dbContext.Projects.AddRange(
             new Project
             {
                 Id = Guid.NewGuid(),
-                Name = "Project Alpha",
-                Description = "First project description",
+                Name = nameAlpha,
+                Description = descAlpha,
                 StartDate = new DateOnly(2025, 1, 1),
                 EndDate = new DateOnly(2025, 6, 30),
                 WeekStartDay = 1,
@@ -42,8 +48,8 @@ public class GetAllProjectsHandlerTests
             new Project
             {
                 Id = Guid.NewGuid(),
-                Name = "Project Beta",
-                Description = "Second project description",
+                Name = nameBeta,
+                Description = descBeta,
                 StartDate = new DateOnly(2025, 2, 1),
                 EndDate = new DateOnly(2025, 12, 31),
                 WeekStartDay = 0,
@@ -64,14 +70,14 @@ public class GetAllProjectsHandlerTests
         result.Value.Should().NotBeNull();
         result.Value.Should().HaveCount(2);
 
-        var alpha = result.Value.Single(p => p.Name == "Project Alpha");
-        alpha.Description.Should().Be("First project description");
+        var alpha = result.Value.Single(p => p.Name == nameAlpha);
+        alpha.Description.Should().Be(descAlpha);
         alpha.DefaultTimelineScale.Should().Be("Daily");
         alpha.ProgressMode.Should().Be("CountBased");
         alpha.Status.Should().Be("Active");
 
-        var beta = result.Value.Single(p => p.Name == "Project Beta");
-        beta.Description.Should().Be("Second project description");
+        var beta = result.Value.Single(p => p.Name == nameBeta);
+        beta.Description.Should().Be(descBeta);
         beta.DefaultTimelineScale.Should().Be("Weekly");
         beta.ProgressMode.Should().Be("WeightBased");
         beta.Status.Should().Be("OnHold");

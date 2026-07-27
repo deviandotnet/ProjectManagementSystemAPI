@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Infrastructure.Data;
 
-namespace PMS.UnitTests.Helpers;
+namespace PMS.IntegrationTests.Helpers;
 
 public static class TestDbContextFactory
 {

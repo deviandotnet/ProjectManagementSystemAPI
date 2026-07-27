@@ -1,16 +1,18 @@
+using Bogus;
 using FluentAssertions;
 using PMS.Application.Features.UserFeatures;
 using PMS.Application.Features.UserFeatures.GetAllUsers;
 using PMS.Domain.Entities;
 using PMS.Infrastructure.Data;
-using PMS.UnitTests.Helpers;
+using PMS.IntegrationTests.Helpers;
 
-namespace PMS.UnitTests.UserFeatures;
+namespace PMS.IntegrationTests.UserFeatures;
 
 public class GetAllUsersHandlerTests
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly GetAllUsersHandler _handler;
+    private readonly Faker _faker = new();
 
     public GetAllUsersHandlerTests()
     {
@@ -22,23 +24,26 @@ public class GetAllUsersHandlerTests
     public async Task HandleAsync_WhenUsersExist_ShouldReturnSuccessResultWithListOfUsers()
     {
         // Arrange
+        var email1 = _faker.Internet.Email();
+        var email2 = _faker.Internet.Email();
+
         _dbContext.Users.AddRange(
             new Users
             {
                 Id = Guid.NewGuid(),
-                FirstName = "UserOne",
-                LastName = "Test",
-                Email = "user1@example.com",
-                PasswordHash = "hash1",
+                FirstName = _faker.Name.FirstName(),
+                LastName = _faker.Name.LastName(),
+                Email = email1,
+                PasswordHash = _faker.Random.Hash(),
                 IsActive = true
             },
             new Users
             {
                 Id = Guid.NewGuid(),
-                FirstName = "UserTwo",
-                LastName = "Test",
-                Email = "user2@example.com",
-                PasswordHash = "hash2",
+                FirstName = _faker.Name.FirstName(),
+                LastName = _faker.Name.LastName(),
+                Email = email2,
+                PasswordHash = _faker.Random.Hash(),
                 IsActive = true
             }
         );
@@ -53,7 +58,7 @@ public class GetAllUsersHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().NotBeNull();
         result.Value.Should().HaveCount(2);
-        result.Value.Select(u => u.Email).Should().Contain(new[] { "user1@example.com", "user2@example.com" });
+        result.Value.Select(u => u.Email).Should().Contain(new[] { email1, email2 });
     }
 
     [Fact]

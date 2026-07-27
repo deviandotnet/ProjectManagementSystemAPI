@@ -10,8 +10,17 @@ namespace PMS.API
     {
         public static void Main(string[] args)
         {
-            // Load environment variables from local .env file if present
-            DotNetEnv.Env.TraversePath().Load();
+            if (File.Exists(".env"))
+            {
+                try
+                {
+                    DotNetEnv.Env.Load();
+                }
+                catch
+                {
+                    // Ignore error if .env loading is not available
+                }
+            }
 
             var builder = WebApplication.CreateBuilder(args);
 

@@ -3,9 +3,9 @@ name: CI/CD Pipeline
 on:
   workflow_dispatch: 
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 env:
   DOTNET_VERSION: "10.0.x"
@@ -21,7 +21,7 @@ jobs:
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ env.DOTNET_VERSION}}
+        dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Restore dependencies
       run: dotnet restore ProjectManagementSystemAPI.slnx
@@ -29,13 +29,13 @@ jobs:
     - name: Build solution
       run: dotnet build ProjectManagementSystemAPI.slnx --no-restore -c Release
 
-    - name: Run Unit Tests
+    - name: Run Unit & Integration Tests
       run: dotnet test ProjectManagementSystemAPI.slnx --no-build -c Release --verbosity normal
 
   deploy:
     name: Deploy to Production Cloud (Render)
     needs: build-and-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/master') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
     - name: Trigger Deploy Hook on Render
@@ -45,3 +45,4 @@ jobs:
         else
           echo "RENDER_DEPLOY_HOOK_URL secret is not set yet. Skipping automatic trigger."
         fi
+

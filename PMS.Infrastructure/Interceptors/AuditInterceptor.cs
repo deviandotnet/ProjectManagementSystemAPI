@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using PMS.Domain.Entities;
+using PMS.SharedKernel;
 
 namespace PMS.Infrastructure.Interceptors;
 

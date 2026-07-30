@@ -1,5 +1,5 @@
 using PMS.Application.Abstractions.Data;
-using PMS.Infrastructure.Data;
+using PMS.Infrastructure.Database;
 
 namespace PMS.Infrastructure.Repository;
 

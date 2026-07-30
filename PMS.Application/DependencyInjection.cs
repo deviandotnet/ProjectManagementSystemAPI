@@ -1,9 +1,8 @@
-﻿using FluentValidation;
+using PMS.Application.Abstractions.Behaviors;
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
-using PMS.Application.Abstractions;
-using PMS.Application.Extensions;
-using PMS.Application.Pipelines;
-using System.Reflection;
+using PMS.Application.Abstractions.Messaging;
+using PMS.SharedKernel;
 
 namespace PMS.Application
 {
@@ -11,39 +10,30 @@ namespace PMS.Application
     {
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
-            var assembly = typeof(DependencyInjection).Assembly;
+            services.Scan(scan => scan.FromAssembliesOf(typeof(DependencyInjection))
+                .AddClasses(classes => classes.AssignableTo(typeof(IQueryHandler<,>)), publicOnly: false)
+                    .AsImplementedInterfaces()
+                    .WithScopedLifetime()
+                .AddClasses(classes => classes.AssignableTo(typeof(ICommandHandler<>)), publicOnly: false)
+                    .AsImplementedInterfaces()
+                    .WithScopedLifetime()
+                .AddClasses(classes => classes.AssignableTo(typeof(ICommandHandler<,>)), publicOnly: false)
+                    .AsImplementedInterfaces()
+                    .WithScopedLifetime());
 
-            services.AddValidatorsFromAssembly(assembly); // Register FluentValidation validators from the assembly
-            services.AddHandlersFromAssembly(assembly); // Register handlers from the assembly
-            services.RegisterApiEndpointsFromAssembly(assembly); // Register API endpoints from the assembly
-            return services;
-        }
+            services.Decorate(typeof(ICommandHandler<,>), typeof(ValidationDecorator.CommandHandler<,>));
+            services.Decorate(typeof(ICommandHandler<>), typeof(ValidationDecorator.CommandBaseHandler<>));
 
-        private static IServiceCollection AddHandlersFromAssembly(this IServiceCollection services, Assembly assembly)
-        {
-            var handlerTypes = assembly.GetTypes()
-            .Where(t =>
-                t.IsClass &&
-                !t.IsAbstract &&
-                !t.ContainsGenericParameters)
-            .ToList();
+            services.Decorate(typeof(IQueryHandler<,>), typeof(LoggingDecorator.QueryHandler<,>));
+            services.Decorate(typeof(ICommandHandler<,>), typeof(LoggingDecorator.CommandHandler<,>));
+            services.Decorate(typeof(ICommandHandler<>), typeof(LoggingDecorator.CommandBaseHandler<>));
 
-            foreach (var implementation in handlerTypes)
-            {
-                var handlerInterfaces = implementation
-                .GetInterfaces()
-                .Where(i =>
-                    i.IsGenericType &&
-                    i.GetGenericTypeDefinition() == typeof(IHandler<,>));
+            services.Scan(scan => scan.FromAssembliesOf(typeof(DependencyInjection))
+                .AddClasses(classes => classes.AssignableTo(typeof(IDomainEventHandler<>)), publicOnly: false)
+                .AsImplementedInterfaces()
+                .WithScopedLifetime());
 
-                foreach (var handlerInterface in handlerInterfaces)
-                {
-                    services.AddScoped(handlerInterface, implementation);
-                }
-            }
-
-            services.Decorate(typeof(IHandler<,>), typeof(ValidationDecorator<,>));
-            services.Decorate(typeof(IHandler<,>), typeof(LoggingDecorator<,>));
+            services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
 
             return services;
         }

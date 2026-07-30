@@ -3,7 +3,7 @@ namespace PMS.Infrastructure.Repository;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
 using PMS.Application.Abstractions.Data;
-using PMS.Infrastructure.Data;
+using PMS.Infrastructure.Database;
 
 public class Repository<T> : IRepository<T> where T : class
 {

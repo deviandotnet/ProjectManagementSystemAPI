@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using PMS.API.Extensions;
 using PMS.Application;
-using PMS.Application.Extensions;
 using PMS.Infrastructure;
+using PMS.Infrastructure.Database;
 using Scalar.AspNetCore;
 
 namespace PMS.API
@@ -62,14 +63,14 @@ namespace PMS.API
             // Auto-Migrate Database on Cloud Startup
             using (var scope = app.Services.CreateScope())
             {
-                var dbContext = scope.ServiceProvider.GetRequiredService<PMS.Infrastructure.Data.ApplicationDbContext>();
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 dbContext.Database.Migrate();
             }
 
             // Middleware Pipeline
             app.UseCors();
 
-            #region //only for development, remove in production (wrap in if (app.Environment.IsDevelopment()) if needed)
+            #region //only for development, remove in production (wrap in if (app.Environment.IsDevelopment()) if needed) just exposed for production testing purposes
             app.MapOpenApi();
             app.MapScalarApiReference();
             #endregion
@@ -77,7 +78,8 @@ namespace PMS.API
             if (app.Environment.IsDevelopment())
             {
                 app.UseHttpsRedirection();
-
+                app.MapOpenApi();
+                app.MapScalarApiReference();
             }
             app.UseAuthorization();
 

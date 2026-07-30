@@ -4,5 +4,6 @@
   <Project Path="PMS.Domain/PMS.Domain.csproj" Id="b594e5b1-45c5-4f69-ae9c-d94efc573332" />
   <Project Path="PMS.Infrastructure/PMS.Infrastructure.csproj" Id="1265a329-6b8f-434a-b874-dee99787de56" />
   <Project Path="PMS.IntegrationTests/PMS.IntegrationTests.csproj" />
+  <Project Path="PMS.SharedKernel/PMS.SharedKernel.csproj" Id="ed9cb484-1f21-4cfd-8758-7cff6c9b3077" />
   <Project Path="PMS.Tests/PMS.UnitTests.csproj" Id="d30f6e2f-c1ce-4961-921f-17eccb0cb1cf" />
 </Solution>

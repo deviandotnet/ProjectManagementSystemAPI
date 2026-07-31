@@ -38,7 +38,5 @@ namespace PMS.Domain.AuditLogs
         public DateTimeOffset ChangedAt { get; set; }
         public string? IpAddress { get; set; }
 
-        // Navigation Properties
-        public virtual User? ChangedBy { get; set; }
     }
 }

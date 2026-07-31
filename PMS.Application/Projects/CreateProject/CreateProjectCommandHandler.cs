@@ -1,0 +1,48 @@
+using Microsoft.EntityFrameworkCore;
+using PMS.Application.Abstractions.Data;
+using PMS.Application.Abstractions.Messaging;
+using PMS.Domain.Projects;
+using PMS.SharedKernel;
+
+namespace PMS.Application.Projects.CreateProject;
+
+internal sealed class CreateProjectCommandHandler(
+    IApplicationDbContext context,
+    IUnitOfWork unitOfWork)
+    : ICommandHandler<CreateProjectCommand, Guid>
+{
+    public async Task<Result<Guid>> Handle(
+        CreateProjectCommand command,
+        CancellationToken cancellationToken)
+    {
+        bool nameExists = await context.Projects
+            .AnyAsync(p => p.Name.ToLower() == command.Name.ToLower(), cancellationToken);
+
+        if (nameExists)
+        {
+            return Result.Failure<Guid>(ProjectErrors.NameAlreadyExists(command.Name));
+        }
+
+        var project = new Project
+        {
+            Id = Guid.NewGuid(),
+            Name = command.Name.Trim(),
+            Description = command.Description?.Trim(),
+            StartDate = command.StartDate,
+            EndDate = command.EndDate,
+            WeekStartDay = command.WeekStartDay,
+            DefaultTimelineScale = command.DefaultTimelineScale,
+            ProgressMode = command.ProgressMode,
+            Status = ProjectStatus.Active,
+            CreatedByUserId = command.CreatedByUserId
+        };
+
+        project.Raise(new ProjectCreatedDomainEvent(project.Id));
+
+        await context.Projects.AddAsync(project, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await unitOfWork.CommitAsync(cancellationToken);
+
+        return project.Id;
+    }
+}

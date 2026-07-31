@@ -36,18 +36,5 @@ namespace PMS.Domain.ActionItems
         public int Sequence { get; set; }
         public string? Remarks { get; set; }
 
-        // Navigation Properties
-        public virtual Project Project { get; set; } = null!;
-        public virtual Category Category { get; set; } = null!;
-        public virtual SubCategory? SubCategory { get; set; }
-
-        /// <summary>Navigation to the registered user assigned as owner (via OwnerId FK).</summary>
-        public virtual User? Owner { get; set; }
-
-        /// <summary>1:1 — Planned scheduling dates. Always present once created.</summary>
-        public virtual PlannedSchedule? PlannedSchedule { get; set; }
-
-        /// <summary>1:1 — Actual execution tracking. Created alongside ActionItem; dates start as null.</summary>
-        public virtual ActualExecution? ActualExecution { get; set; }
     }
 }

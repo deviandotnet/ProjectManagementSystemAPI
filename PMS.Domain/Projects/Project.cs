@@ -25,9 +25,5 @@ namespace PMS.Domain.Projects
         public ProgressMode ProgressMode { get; set; } = ProgressMode.CountBased;
         public ProjectStatus Status { get; set; } = ProjectStatus.Active;
 
-        // Navigation Properties
-        public virtual ICollection<Category> Categories { get; set; } = new List<Category>();
-        public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = new List<ProjectMember>();
-        public virtual ICollection<ActionItem> ActionItems { get; set; } = new List<ActionItem>();
     }
 }

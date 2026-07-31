@@ -7,9 +7,23 @@ namespace PMS.SharedKernel
     /// </summary>
     public abstract class AuditableBaseEntity
     {
+        private readonly List<IDomainEvent> _domainEvents = [];
+
         public Guid? CreatedByUserId { get; set; }
         public Guid? UpdatedByUserId { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
+
+        public List<IDomainEvent> DomainEvents => [.. _domainEvents];
+
+        public void Raise(IDomainEvent domainEvent)
+        {
+            _domainEvents.Add(domainEvent);
+        }
+
+        public void ClearDomainEvents()
+        {
+            _domainEvents.Clear();
+        }
     }
 }

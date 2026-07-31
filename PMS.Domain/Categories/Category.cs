@@ -20,9 +20,5 @@ namespace PMS.Domain.Categories
         /// <summary>Hex color string (e.g. #3A86FF). Used for timeline row color coding.</summary>
         public string? Color { get; set; }
 
-        // Navigation Properties
-        public virtual Project Project { get; set; } = null!;
-        public virtual ICollection<SubCategory> SubCategories { get; set; } = new List<SubCategory>();
-        public virtual ICollection<ActionItem> ActionItems { get; set; } = new List<ActionItem>();
     }
 }

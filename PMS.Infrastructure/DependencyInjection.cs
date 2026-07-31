@@ -11,16 +11,22 @@ namespace PMS.Infrastructure
     public static class DependencyInjection
     {
         public static IServiceCollection AddInfrastructure(
-        this IServiceCollection services,
-        IConfiguration configuration)
+            this IServiceCollection services,
+            IConfiguration configuration)
         {
             services.AddSingleton<AuditInterceptor>();
 
             services.AddDbContext<ApplicationDbContext>((sp, options) =>
             {
-                options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
-                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+                if (!options.IsConfigured)
+                {
+                    var connectionString = configuration.GetConnectionString("DbConnection")
+                        ?? Environment.GetEnvironmentVariable("ConnectionStrings__DbConnection")
+                        ?? throw new InvalidOperationException("Database connection string is not configured.");
 
+                    options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
+                    options.UseNpgsql(connectionString);
+                }
             });
 
             // Register the interface so handlers can inject IApplicationDbContext

@@ -5,5 +5,5 @@ namespace PMS.Application.Abstractions;
 
 public interface IApiEndpoint
 {
-    void MapEndpoint(WebApplication app);
+    void MapEndpoint(IEndpointRouteBuilder app);
 }

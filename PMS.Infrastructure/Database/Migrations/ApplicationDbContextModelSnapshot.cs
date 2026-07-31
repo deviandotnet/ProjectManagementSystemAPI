@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using PMS.Infrastructure.Database;
 
 #nullable disable
 
@@ -21,7 +22,7 @@ namespace PMS.Infrastructure.Database.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("PMS.Domain.Entities.ActionItems", b =>
+            modelBuilder.Entity("PMS.Domain.ActionItems.ActionItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -96,7 +97,7 @@ namespace PMS.Infrastructure.Database.Migrations
                     b.ToTable("tbl.ps_ActionItems", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.ActualExecution", b =>
+            modelBuilder.Entity("PMS.Domain.ActualExecutions.ActualExecution", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -146,7 +147,7 @@ namespace PMS.Infrastructure.Database.Migrations
                     b.ToTable("tbl.ps_ActualExecutions", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.AuditLog", b =>
+            modelBuilder.Entity("PMS.Domain.AuditLogs.AuditLog", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -204,7 +205,7 @@ namespace PMS.Infrastructure.Database.Migrations
                     b.ToTable("tbl.ps_AuditLogs", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.Category", b =>
+            modelBuilder.Entity("PMS.Domain.Categories.Category", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -249,7 +250,7 @@ namespace PMS.Infrastructure.Database.Migrations
                     b.ToTable("tbl.ps_Categories", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.HolidayCalendar", b =>
+            modelBuilder.Entity("PMS.Domain.HolidayCalendars.HolidayCalendar", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -288,7 +289,7 @@ namespace PMS.Infrastructure.Database.Migrations
                     b.ToTable("tbl.ms_HolidayCalendar", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.PlannedSchedule", b =>
+            modelBuilder.Entity("PMS.Domain.PlannedSchedules.PlannedSchedule", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -336,7 +337,52 @@ namespace PMS.Infrastructure.Database.Migrations
                     b.ToTable("tbl.ps_PlannedSchedules", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.Project", b =>
+            modelBuilder.Entity("PMS.Domain.ProjectMembers.ProjectMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("JoinedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now() at time zone 'utc'");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte>("Role")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ProjectId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("tbl.ps_ProjectMembers", (string)null);
+                });
+
+            modelBuilder.Entity("PMS.Domain.Projects.Project", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -393,55 +439,12 @@ namespace PMS.Infrastructure.Database.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByUserId");
+
                     b.ToTable("tbl.ps_Projects", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.ProjectMember", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now() at time zone 'utc'");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("JoinedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now() at time zone 'utc'");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
-                    b.Property<byte>("Role")
-                        .HasColumnType("smallint");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("ProjectId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("tbl.ps_ProjectMembers", (string)null);
-                });
-
-            modelBuilder.Entity("PMS.Domain.Entities.SubCategory", b =>
+            modelBuilder.Entity("PMS.Domain.SubCategories.SubCategory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -482,7 +485,7 @@ namespace PMS.Infrastructure.Database.Migrations
                     b.ToTable("tbl.ps_SubCategories", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.Users", b =>
+            modelBuilder.Entity("PMS.Domain.Users.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -540,154 +543,102 @@ namespace PMS.Infrastructure.Database.Migrations
                     b.ToTable("tbl.ps_Users", (string)null);
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.ActionItems", b =>
+            modelBuilder.Entity("PMS.Domain.ActionItems.ActionItem", b =>
                 {
-                    b.HasOne("PMS.Domain.Entities.Category", "Category")
-                        .WithMany("ActionItems")
+                    b.HasOne("PMS.Domain.Categories.Category", null)
+                        .WithMany()
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("PMS.Domain.Entities.Users", "Owner")
-                        .WithMany("OwnedActionItems")
+                    b.HasOne("PMS.Domain.Users.User", null)
+                        .WithMany()
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("PMS.Domain.Entities.Project", "Project")
-                        .WithMany("ActionItems")
+                    b.HasOne("PMS.Domain.Projects.Project", null)
+                        .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("PMS.Domain.Entities.SubCategory", "SubCategory")
-                        .WithMany("ActionItems")
+                    b.HasOne("PMS.Domain.SubCategories.SubCategory", null)
+                        .WithMany()
                         .HasForeignKey("SubCategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Category");
-
-                    b.Navigation("Owner");
-
-                    b.Navigation("Project");
-
-                    b.Navigation("SubCategory");
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.ActualExecution", b =>
+            modelBuilder.Entity("PMS.Domain.ActualExecutions.ActualExecution", b =>
                 {
-                    b.HasOne("PMS.Domain.Entities.ActionItems", "ActionItem")
-                        .WithOne("ActualExecution")
-                        .HasForeignKey("PMS.Domain.Entities.ActualExecution", "ActionItemId")
+                    b.HasOne("PMS.Domain.ActionItems.ActionItem", null)
+                        .WithOne()
+                        .HasForeignKey("PMS.Domain.ActualExecutions.ActualExecution", "ActionItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("PMS.Domain.Entities.Users", "CompletedBy")
-                        .WithMany("CompletedExecutions")
+                    b.HasOne("PMS.Domain.Users.User", null)
+                        .WithMany()
                         .HasForeignKey("CompletedById")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("ActionItem");
-
-                    b.Navigation("CompletedBy");
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.AuditLog", b =>
+            modelBuilder.Entity("PMS.Domain.AuditLogs.AuditLog", b =>
                 {
-                    b.HasOne("PMS.Domain.Entities.Users", "ChangedBy")
+                    b.HasOne("PMS.Domain.Users.User", null)
                         .WithMany()
                         .HasForeignKey("ChangedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("ChangedBy");
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.Category", b =>
+            modelBuilder.Entity("PMS.Domain.Categories.Category", b =>
                 {
-                    b.HasOne("PMS.Domain.Entities.Project", "Project")
-                        .WithMany("Categories")
+                    b.HasOne("PMS.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PMS.Domain.PlannedSchedules.PlannedSchedule", b =>
+                {
+                    b.HasOne("PMS.Domain.ActionItems.ActionItem", null)
+                        .WithOne()
+                        .HasForeignKey("PMS.Domain.PlannedSchedules.PlannedSchedule", "ActionItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PMS.Domain.ProjectMembers.ProjectMember", b =>
+                {
+                    b.HasOne("PMS.Domain.Projects.Project", null)
+                        .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("PMS.Domain.Entities.PlannedSchedule", b =>
-                {
-                    b.HasOne("PMS.Domain.Entities.ActionItems", "ActionItem")
-                        .WithOne("PlannedSchedule")
-                        .HasForeignKey("PMS.Domain.Entities.PlannedSchedule", "ActionItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ActionItem");
-                });
-
-            modelBuilder.Entity("PMS.Domain.Entities.ProjectMember", b =>
-                {
-                    b.HasOne("PMS.Domain.Entities.Project", "Project")
-                        .WithMany("ProjectMembers")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PMS.Domain.Entities.Users", "User")
-                        .WithMany("ProjectMembers")
+                    b.HasOne("PMS.Domain.Users.User", null)
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Project");
-
-                    b.Navigation("User");
                 });
 
-            modelBuilder.Entity("PMS.Domain.Entities.SubCategory", b =>
+            modelBuilder.Entity("PMS.Domain.Projects.Project", b =>
                 {
-                    b.HasOne("PMS.Domain.Entities.Category", "Category")
-                        .WithMany("SubCategories")
+                    b.HasOne("PMS.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PMS.Domain.SubCategories.SubCategory", b =>
+                {
+                    b.HasOne("PMS.Domain.Categories.Category", null)
+                        .WithMany()
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Category");
-                });
-
-            modelBuilder.Entity("PMS.Domain.Entities.ActionItems", b =>
-                {
-                    b.Navigation("ActualExecution");
-
-                    b.Navigation("PlannedSchedule");
-                });
-
-            modelBuilder.Entity("PMS.Domain.Entities.Category", b =>
-                {
-                    b.Navigation("ActionItems");
-
-                    b.Navigation("SubCategories");
-                });
-
-            modelBuilder.Entity("PMS.Domain.Entities.Project", b =>
-                {
-                    b.Navigation("ActionItems");
-
-                    b.Navigation("Categories");
-
-                    b.Navigation("ProjectMembers");
-                });
-
-            modelBuilder.Entity("PMS.Domain.Entities.SubCategory", b =>
-                {
-                    b.Navigation("ActionItems");
-                });
-
-            modelBuilder.Entity("PMS.Domain.Entities.Users", b =>
-                {
-                    b.Navigation("CompletedExecutions");
-
-                    b.Navigation("OwnedActionItems");
-
-                    b.Navigation("ProjectMembers");
                 });
 #pragma warning restore 612, 618
         }

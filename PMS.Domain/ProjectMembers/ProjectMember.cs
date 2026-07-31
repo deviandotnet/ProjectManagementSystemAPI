@@ -16,9 +16,5 @@ namespace PMS.Domain.ProjectMembers
         public Guid UserId { get; set; }
         public UserRole Role { get; set; }
         public DateTimeOffset JoinedAt { get; set; }
-
-        // Navigation Properties
-        public virtual Project Project { get; set; } = null!;
-        public virtual User User { get; set; } = null!;
     }
 }

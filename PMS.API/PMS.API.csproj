@@ -23,4 +23,9 @@
 		<ProjectReference Include="..\PMS.Infrastructure\PMS.Infrastructure.csproj" />
 	</ItemGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>PMS.IntegrationTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

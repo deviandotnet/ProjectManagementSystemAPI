@@ -16,9 +16,5 @@ namespace PMS.Domain.SubCategories
         public Guid CategoryId { get; set; }
         public string Name { get; set; } = string.Empty;
         public int DisplayOrder { get; set; }
-
-        // Navigation Properties
-        public virtual Category Category { get; set; } = null!;
-        public virtual ICollection<ActionItem> ActionItems { get; set; } = new List<ActionItem>();
     }
 }

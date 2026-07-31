@@ -19,13 +19,5 @@ namespace PMS.Domain.Users
         public string PasswordHash { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
 
-        // Navigation Properties
-        public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = new List<ProjectMember>();
-
-        /// <summary>ActionItems where this user is the assigned owner (OwnerId FK).</summary>
-        public virtual ICollection<ActionItem> OwnedActionItems { get; set; } = new List<ActionItem>();
-
-        /// <summary>ActualExecutions where this user is marked as the completer (CompletedById FK).</summary>
-        public virtual ICollection<ActualExecution> CompletedExecutions { get; set; } = new List<ActualExecution>();
     }
 }

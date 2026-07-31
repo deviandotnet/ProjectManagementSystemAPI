@@ -1,3 +1,4 @@
+using DotNetEnv;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using PMS.API.Extensions;
@@ -12,19 +13,10 @@ namespace PMS.API
     {
         public static void Main(string[] args)
         {
-            if (File.Exists(".env"))
-            {
-                try
-                {
-                    DotNetEnv.Env.Load();
-                }
-                catch
-                {
-                    // Ignore error if .env loading is not available
-                }
-            }
+            Env.TraversePath().Load(); // Load environment variables from .env file (traversing parent paths)
 
             var builder = WebApplication.CreateBuilder(args);
+            builder.Configuration.AddEnvironmentVariables();
 
             // Configure Forwarded Headers for Proxy (Render)
             builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -45,8 +37,11 @@ namespace PMS.API
                 });
             });
 
-            // Application (Handlers + Validators + Endpoints)
+            // Application (Handlers + Validators)
             builder.Services.AddApplication();
+
+            // API Endpoints
+            builder.Services.RegisterApiEndpointsFromAssembly(typeof(Program).Assembly);
 
             // Infrastructure (DbContext + AuditInterceptor)
             builder.Services.AddInfrastructure(builder.Configuration);
@@ -64,23 +59,22 @@ namespace PMS.API
             using (var scope = app.Services.CreateScope())
             {
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                dbContext.Database.Migrate();
+                if (dbContext.Database.IsRelational())
+                {
+                    dbContext.Database.Migrate();
+                }
             }
 
             // Middleware Pipeline
             app.UseCors();
 
-            #region //only for development, remove in production (wrap in if (app.Environment.IsDevelopment()) if needed) just exposed for production testing purposes
-            app.MapOpenApi();
-            app.MapScalarApiReference();
-            #endregion
-
             if (app.Environment.IsDevelopment())
             {
                 app.UseHttpsRedirection();
-                app.MapOpenApi();
-                app.MapScalarApiReference();
             }
+
+            app.MapOpenApi();
+            app.MapScalarApiReference();
             app.UseAuthorization();
 
             // Auto-discover and register all Minimal API endpoints

@@ -30,8 +30,5 @@ namespace PMS.Domain.PlannedSchedules
 
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
-
-        // Navigation Properties
-        public virtual ActionItem ActionItem { get; set; } = null!;
     }
 }

@@ -14,7 +14,6 @@ namespace PMS.Application.Abstractions.Data;
 
 public interface IApplicationDbContext
 {
-
     // ── Core Tables ────────────────────────────────────────────────────────────
     DbSet<User> Users { get; }
     DbSet<Project> Projects { get; }
@@ -34,4 +33,5 @@ public interface IApplicationDbContext
     DbSet<AuditLog> AuditLogs { get; }
 
     // ──────────────────────────────────────────────────────────────────────────
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

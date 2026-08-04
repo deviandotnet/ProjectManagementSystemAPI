@@ -8,9 +8,9 @@ public static class UserErrors
         "Users.NotFound",
         $"The user was not found.");
 
-    public static Error NotFoundById = Error.NotFound(
+    public static Error NotFoundById(Guid id) => Error.NotFound(
         "Users.NotFound",
-        $"The user with specified Id was not found.");
+        $"The user with Id '{id}' was not found.");
 
     public static readonly Error EmailAlreadyExists = Error.Conflict(
         "Users.EmailAlreadyExists",

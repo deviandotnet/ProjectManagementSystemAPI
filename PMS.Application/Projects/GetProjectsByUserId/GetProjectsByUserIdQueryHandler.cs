@@ -26,7 +26,7 @@ internal sealed class GetProjectsByUserIdQueryHandler(
 
         if (!userExists)
         {
-            return Result.Failure<List<ProjectResponse>>(UserErrors.NotFoundById);
+            return Result.Failure<List<ProjectResponse>>(UserErrors.NotFoundById(query.UserId));
         }
 
         List<ProjectResponse> projects = await context.Projects

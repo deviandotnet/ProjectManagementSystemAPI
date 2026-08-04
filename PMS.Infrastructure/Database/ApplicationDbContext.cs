@@ -47,8 +47,11 @@ namespace PMS.Infrastructure.Database
         // ── Global / Cross-cutting ─────────────────────────────────────────────────
         public DbSet<HolidayCalendar> HolidayCalendar => Set<HolidayCalendar>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
         // ──────────────────────────────────────────────────────────────────────────
+
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

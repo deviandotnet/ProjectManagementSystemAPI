@@ -31,6 +31,7 @@ public interface IApplicationDbContext
     // ── Global / Cross-cutting ─────────────────────────────────────────────────
     DbSet<HolidayCalendar> HolidayCalendar { get; }
     DbSet<AuditLog> AuditLogs { get; }
+    DbSet<RefreshToken> RefreshTokens { get; }
 
     // ──────────────────────────────────────────────────────────────────────────
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

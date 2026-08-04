@@ -1,10 +1,10 @@
 using FluentValidation;
 
-namespace PMS.Application.Users.CreateUser;
+namespace PMS.Application.Users.RegisterUser;
 
-public sealed class CreateUserCommandValidator : AbstractValidator<CreateUserCommand>
+public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUserCommand>
 {
-    public CreateUserCommandValidator()
+    public RegisterUserCommandValidator()
     {
         RuleFor(c => c.FirstName)
             .NotEmpty()

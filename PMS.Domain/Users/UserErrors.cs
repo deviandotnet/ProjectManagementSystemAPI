@@ -4,15 +4,19 @@ namespace PMS.Domain.Users;
 
 public static class UserErrors
 {
-    public static Error NotFound(Guid userId) => Error.NotFound(
+    public static readonly Error NotFound = Error.NotFound(
         "Users.NotFound",
-        $"The user with the Id = '{userId}' was not found.");
+        $"The user was not found.");
 
-    public static Error EmailAlreadyExists(string email) => Error.Conflict(
+    public static readonly Error EmailAlreadyExists = Error.Conflict(
         "Users.EmailAlreadyExists",
-        $"The email '{email}' is already registered.");
+        $"The email is already registered.");
 
-    public static Error Unauthorized() => Error.Failure(
+    public static readonly Error Unauthorized = Error.Failure(
         "Users.Unauthorized",
         "User is unauthorized.");
+
+    public static readonly Error NotFoundByEmail = Error.NotFound(
+        "Users.NotFoundByEmail",
+        "The user with the specified email was not found.");
 }

@@ -1,8 +1,8 @@
 using PMS.Application.Abstractions.Messaging;
 
-namespace PMS.Application.Users.CreateUser;
+namespace PMS.Application.Users.RegisterUser;
 
-public sealed record CreateUserCommand(
+public sealed record RegisterUserCommand(
     string FirstName,
     string? MiddleName,
     string LastName,

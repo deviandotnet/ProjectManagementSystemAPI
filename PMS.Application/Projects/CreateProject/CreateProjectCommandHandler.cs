@@ -1,20 +1,28 @@
 using Microsoft.EntityFrameworkCore;
+using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.Projects;
+using PMS.Domain.Users;
 using PMS.SharedKernel;
 
 namespace PMS.Application.Projects.CreateProject;
 
 internal sealed class CreateProjectCommandHandler(
     IApplicationDbContext context,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IUserContext userContext)
     : ICommandHandler<CreateProjectCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(
         CreateProjectCommand command,
         CancellationToken cancellationToken)
     {
+        if (!userContext.IsAuthenticated)
+        {
+            return Result.Failure<Guid>(UserErrors.Unauthorized);
+        }
+
         bool nameExists = await context.Projects
             .AnyAsync(p => p.Name.ToLower() == command.Name.ToLower(), cancellationToken);
 
@@ -33,8 +41,7 @@ internal sealed class CreateProjectCommandHandler(
             WeekStartDay = command.WeekStartDay,
             DefaultTimelineScale = command.DefaultTimelineScale,
             ProgressMode = command.ProgressMode,
-            Status = ProjectStatus.Active,
-            CreatedByUserId = command.CreatedByUserId
+            Status = ProjectStatus.Active
         };
 
         project.Raise(new ProjectCreatedDomainEvent(project.Id));

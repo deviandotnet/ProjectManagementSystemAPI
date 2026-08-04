@@ -19,8 +19,7 @@ internal sealed class CreateProject : IApiEndpoint
         DateOnly EndDate,
         int WeekStartDay = 1,
         TimelineScale DefaultTimelineScale = TimelineScale.Weekly,
-        ProgressMode ProgressMode = ProgressMode.CountBased,
-        Guid? CreatedByUserId = null
+        ProgressMode ProgressMode = ProgressMode.CountBased
     );
 
     public void MapEndpoint(IEndpointRouteBuilder app)
@@ -37,8 +36,7 @@ internal sealed class CreateProject : IApiEndpoint
                 request.EndDate,
                 request.WeekStartDay,
                 request.DefaultTimelineScale,
-                request.ProgressMode,
-                request.CreatedByUserId);
+                request.ProgressMode);
 
             Result<Guid> result = await handler.Handle(command, cancellationToken);
 
@@ -46,6 +44,7 @@ internal sealed class CreateProject : IApiEndpoint
                 id => Results.Created($"/api/projects/{id}", id),
                 CustomResults.Problem);
         })
+        .RequireAuthorization()
         .WithTags(Tags.Projects);
     }
 }

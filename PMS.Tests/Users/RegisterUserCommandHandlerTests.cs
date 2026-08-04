@@ -3,14 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
-using PMS.Application.Users.CreateUser;
+using PMS.Application.Users.RegisterUser;
 using PMS.Domain.Users;
 using PMS.Infrastructure.Database;
 using PMS.SharedKernel;
 
 namespace PMS.UnitTests.Users;
 
-public class CreateUserCommandHandlerTests
+public class RegisterUserCommandHandlerTests
 {
     private static ApplicationDbContext CreateDbContext()
     {
@@ -39,9 +39,9 @@ public class CreateUserCommandHandlerTests
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var passwordHasher = Substitute.For<IPasswordHasher>();
-        var handler = new CreateUserCommandHandler(context, unitOfWork, passwordHasher);
+        var handler = new RegisterUserCommandHandler(context, unitOfWork, passwordHasher);
 
-        var command = new CreateUserCommand(
+        var command = new RegisterUserCommand(
             FirstName: "John",
             MiddleName: null,
             LastName: "Doe",
@@ -54,7 +54,7 @@ public class CreateUserCommandHandlerTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Should().Be(UserErrors.EmailAlreadyExists("JOHN.DOE@EXAMPLE.COM"));
+        result.Error.Should().Be(UserErrors.EmailAlreadyExists);
     }
 
     [Fact]
@@ -66,9 +66,9 @@ public class CreateUserCommandHandlerTests
         var passwordHasher = Substitute.For<IPasswordHasher>();
         passwordHasher.Hash("SecurePass123!").Returns("hashed_secure_pass");
 
-        var handler = new CreateUserCommandHandler(context, unitOfWork, passwordHasher);
+        var handler = new RegisterUserCommandHandler(context, unitOfWork, passwordHasher);
 
-        var command = new CreateUserCommand(
+        var command = new RegisterUserCommand(
             FirstName: "Alice",
             MiddleName: "M",
             LastName: "Smith",

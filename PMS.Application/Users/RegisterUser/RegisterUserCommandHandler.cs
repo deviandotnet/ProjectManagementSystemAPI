@@ -5,16 +5,16 @@ using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.Users;
 using PMS.SharedKernel;
 
-namespace PMS.Application.Users.CreateUser;
+namespace PMS.Application.Users.RegisterUser;
 
-internal sealed class CreateUserCommandHandler(
+internal sealed class RegisterUserCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher)
-    : ICommandHandler<CreateUserCommand, Guid>
+    : ICommandHandler<RegisterUserCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(
-        CreateUserCommand command,
+        RegisterUserCommand command,
         CancellationToken cancellationToken)
     {
         string normalizedEmail = command.Email.Trim().ToLowerInvariant();
@@ -24,7 +24,7 @@ internal sealed class CreateUserCommandHandler(
 
         if (emailExists)
         {
-            return Result.Failure<Guid>(UserErrors.EmailAlreadyExists(command.Email));
+            return Result.Failure<Guid>(UserErrors.EmailAlreadyExists);
         }
 
         string passwordHash = passwordHasher.Hash(command.Password);

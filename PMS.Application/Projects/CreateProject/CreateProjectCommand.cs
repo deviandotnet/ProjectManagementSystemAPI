@@ -10,6 +10,5 @@ public sealed record CreateProjectCommand(
     DateOnly EndDate,
     int WeekStartDay = 1,
     TimelineScale DefaultTimelineScale = TimelineScale.Weekly,
-    ProgressMode ProgressMode = ProgressMode.CountBased,
-    Guid? CreatedByUserId = null
+    ProgressMode ProgressMode = ProgressMode.CountBased
 ) : ICommand<Guid>;

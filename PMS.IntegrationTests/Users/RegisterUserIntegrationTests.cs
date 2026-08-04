@@ -11,12 +11,12 @@ using PMS.Infrastructure.Database;
 
 namespace PMS.IntegrationTests.Users;
 
-public class CreateUserIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class RegisterUserIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly HttpClient _client;
     private readonly WebApplicationFactory<Program> _factory;
 
-    public CreateUserIntegrationTests(WebApplicationFactory<Program> factory)
+    public RegisterUserIntegrationTests(WebApplicationFactory<Program> factory)
     {
         var dbName = Guid.NewGuid().ToString();
 
@@ -38,10 +38,10 @@ public class CreateUserIntegrationTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
-    public async Task CreateUser_Should_Return201Created_WhenRequestIsValid()
+    public async Task RegisterUser_Should_Return201Created_WhenRequestIsValid()
     {
         // Arrange
-        var request = new CreateUser.UserRequest(
+        var request = new RegisterUser.RegisterUserRequest(
             FirstName: "Integration",
             MiddleName: null,
             LastName: "Tester",
@@ -60,10 +60,10 @@ public class CreateUserIntegrationTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
-    public async Task CreateUser_Should_Return409Conflict_WhenEmailAlreadyExists()
+    public async Task RegisterUser_Should_Return409Conflict_WhenEmailAlreadyExists()
     {
         // Arrange
-        var request = new CreateUser.UserRequest(
+        var request = new RegisterUser.RegisterUserRequest(
             FirstName: "Duplicate",
             MiddleName: null,
             LastName: "User",

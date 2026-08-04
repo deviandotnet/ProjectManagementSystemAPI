@@ -5,14 +5,14 @@ using PMS.API.Endpoints;
 using PMS.API.Extensions;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Messaging;
-using PMS.Application.Users.CreateUser;
+using PMS.Application.Users.RegisterUser;
 using PMS.SharedKernel;
 
 namespace PMS.API.Endpoints.Users;
 
-internal sealed class CreateUser : IApiEndpoint
+internal sealed class RegisterUser : IApiEndpoint
 {
-    public sealed record UserRequest(
+    public sealed record RegisterUserRequest(
         string FirstName,
         string? MiddleName,
         string LastName,
@@ -23,11 +23,11 @@ internal sealed class CreateUser : IApiEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("api/users", async (
-            UserRequest request,
-            ICommandHandler<CreateUserCommand, Guid> handler,
+            RegisterUserRequest request,
+            ICommandHandler<RegisterUserCommand, Guid> handler,
             CancellationToken cancellationToken) =>
         {
-            var command = new CreateUserCommand(
+            var command = new RegisterUserCommand(
                 request.FirstName,
                 request.MiddleName,
                 request.LastName,

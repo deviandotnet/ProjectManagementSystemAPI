@@ -5,7 +5,6 @@ using PMS.API.Extensions;
 using PMS.Application;
 using PMS.Infrastructure;
 using PMS.Infrastructure.Database;
-using Scalar.AspNetCore;
 
 namespace PMS.API
 {
@@ -48,7 +47,7 @@ namespace PMS.API
 
             // API Services 
             builder.Services.AddAuthorization();
-            builder.Services.AddOpenApi();
+            builder.Services.AddOpenApiWithAuth();
 
             var app = builder.Build();
 
@@ -68,17 +67,17 @@ namespace PMS.API
             // Middleware Pipeline
             app.UseCors();
 
+            // Auto-discover and register all Minimal API endpoints
+            app.MapApiEndpoints();
+
             if (app.Environment.IsDevelopment())
             {
+                app.UseScalarWithUi();
                 app.UseHttpsRedirection();
             }
 
-            app.MapOpenApi();
-            app.MapScalarApiReference();
+            app.UseAuthentication();
             app.UseAuthorization();
-
-            // Auto-discover and register all Minimal API endpoints
-            app.MapApiEndpoints();
 
             app.Run();
         }

@@ -40,6 +40,8 @@ internal sealed class RegisterUser : IApiEndpoint
                 id => Results.Created($"/api/users/{id}", id),
                 CustomResults.Problem);
         })
+        .WithSummary("Register User")
+        .WithDescription("Registers a new user account with first name, last name, unique email, and password.")
         .WithTags(Tags.Users);
     }
 }

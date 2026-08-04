@@ -5,31 +5,31 @@ using PMS.API.Endpoints;
 using PMS.API.Extensions;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Messaging;
-using PMS.Application.Projects.DeleteProject;
+using PMS.Application.ProjectMembers.RemoveProjectMember;
 using PMS.SharedKernel;
 
-namespace PMS.API.Endpoints.Projects;
+namespace PMS.API.Endpoints.ProjectMembers;
 
-internal sealed class DeleteProject : IApiEndpoint
+internal sealed class RemoveProjectMember : IApiEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapDelete("api/projects/{id:guid}", async (
+        app.MapDelete("api/projects/{id:guid}/members/{userId:guid}", async (
             Guid id,
-            ICommandHandler<DeleteProjectCommand> handler,
+            Guid userId,
+            ICommandHandler<RemoveProjectMemberCommand> handler,
             CancellationToken cancellationToken) =>
         {
-            var command = new DeleteProjectCommand(id);
-
+            var command = new RemoveProjectMemberCommand(id, userId);
             Result result = await handler.Handle(command, cancellationToken);
 
             return result.Match(
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .RequireAuthorization("RequireProjectAdmin")
-        .WithSummary("Delete Project")
-        .WithDescription("Permanently deletes a project and all associated data by project ID. Requires Project Admin authorization.")
+        .RequireAuthorization("RequireProjectManager")
+        .WithSummary("Remove Project Member")
+        .WithDescription("Removes a member from the specified project by project ID and user ID. Requires ProjectManager authorization.")
         .WithTags(Tags.Projects);
     }
 }

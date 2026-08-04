@@ -1,12 +1,15 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PMS.API;
+using PMS.API.Endpoints.ProjectMembers;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.ProjectMembers.GetProjectMembers;
 using PMS.Domain.ProjectMembers;
 using PMS.Domain.Projects;
 using PMS.Domain.Users;
@@ -16,11 +19,11 @@ using Xunit;
 
 namespace PMS.IntegrationTests.Projects;
 
-public class DeleteProjectIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class ProjectMembersIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
 
-    public DeleteProjectIntegrationTests(WebApplicationFactory<Program> factory)
+    public ProjectMembersIntegrationTests(WebApplicationFactory<Program> factory)
     {
         var dbName = Guid.NewGuid().ToString();
 
@@ -56,9 +59,9 @@ public class DeleteProjectIntegrationTests : IClassFixture<WebApplicationFactory
         var user = new User
         {
             Id = Guid.NewGuid(),
-            FirstName = "Integration",
-            LastName = "User",
-            Email = $"user_{Guid.NewGuid()}@test.com",
+            FirstName = "Project",
+            LastName = "Manager",
+            Email = $"pm_{Guid.NewGuid()}@test.com",
             PasswordHash = "hashedpassword"
         };
         context.Users.Add(user);
@@ -73,35 +76,7 @@ public class DeleteProjectIntegrationTests : IClassFixture<WebApplicationFactory
     }
 
     [Fact]
-    public async Task DeleteProject_Should_Return401Unauthorized_WhenNotAuthenticated()
-    {
-        // Arrange
-        var client = _factory.CreateClient();
-        Guid randomId = Guid.NewGuid();
-
-        // Act
-        HttpResponseMessage response = await client.DeleteAsync($"api/projects/{randomId}");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task DeleteProject_Should_Return404NotFound_WhenProjectDoesNotExist()
-    {
-        // Arrange
-        var (_, client) = await CreateAuthenticatedClientAsync();
-        Guid nonExistentId = Guid.NewGuid();
-
-        // Act
-        HttpResponseMessage response = await client.DeleteAsync($"api/projects/{nonExistentId}");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
-    public async Task DeleteProject_Should_Return204NoContent_WhenDeleteIsSuccessful()
+    public async Task GetProjectMembers_Should_Return200OkWithMembers_WhenUserIsMember()
     {
         // Arrange
         var (user, client) = await CreateAuthenticatedClientAsync();
@@ -113,8 +88,7 @@ public class DeleteProjectIntegrationTests : IClassFixture<WebApplicationFactory
             var project = new Project
             {
                 Id = projectId,
-                Name = "Project To Be Deleted",
-                Description = "Integration test project",
+                Name = "Integration Project",
                 StartDate = DateOnly.FromDateTime(DateTime.Today),
                 EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(10)),
                 CreatedByUserId = user.Id
@@ -124,7 +98,7 @@ public class DeleteProjectIntegrationTests : IClassFixture<WebApplicationFactory
                 Id = Guid.NewGuid(),
                 ProjectId = projectId,
                 UserId = user.Id,
-                Role = UserRole.Admin,
+                Role = UserRole.ProjectManager,
                 JoinedAt = DateTimeOffset.UtcNow
             };
             context.Projects.Add(project);
@@ -133,16 +107,64 @@ public class DeleteProjectIntegrationTests : IClassFixture<WebApplicationFactory
         }
 
         // Act
-        HttpResponseMessage response = await client.DeleteAsync($"api/projects/{projectId}");
+        HttpResponseMessage response = await client.GetAsync($"api/projects/{projectId}/members");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        List<ProjectMemberResponse>? members = await response.Content.ReadFromJsonAsync<List<ProjectMemberResponse>>();
+        members.Should().NotBeNull();
+        members!.Should().ContainSingle(m => m.UserId == user.Id && m.Role == UserRole.ProjectManager);
+    }
+
+    [Fact]
+    public async Task AddProjectMember_Should_Return201Created_WhenUserIsProjectManager()
+    {
+        // Arrange
+        var (pmUser, client) = await CreateAuthenticatedClientAsync();
+        Guid projectId = Guid.NewGuid();
+        Guid newMemberUserId = Guid.NewGuid();
 
         using (var scope = _factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var deletedProject = await context.Projects.SingleOrDefaultAsync(p => p.Id == projectId);
-            deletedProject.Should().BeNull();
+
+            var newMemberUser = new User
+            {
+                Id = newMemberUserId,
+                FirstName = "Team",
+                LastName = "Member",
+                Email = $"member_{Guid.NewGuid()}@test.com",
+                PasswordHash = "hashedpassword"
+            };
+            var project = new Project
+            {
+                Id = projectId,
+                Name = "Project To Add Member",
+                StartDate = DateOnly.FromDateTime(DateTime.Today),
+                EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(10)),
+                CreatedByUserId = pmUser.Id
+            };
+            var pmMember = new ProjectMember
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                UserId = pmUser.Id,
+                Role = UserRole.ProjectManager,
+                JoinedAt = DateTimeOffset.UtcNow
+            };
+
+            context.Users.Add(newMemberUser);
+            context.Projects.Add(project);
+            context.ProjectMembers.Add(pmMember);
+            await context.SaveChangesAsync();
         }
+
+        var request = new AddProjectMember.AddMemberRequest(newMemberUserId, UserRole.TeamLeader);
+
+        // Act
+        HttpResponseMessage response = await client.PostAsJsonAsync($"api/projects/{projectId}/members", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 }

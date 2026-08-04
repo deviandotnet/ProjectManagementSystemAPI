@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
+using PMS.Domain.ProjectMembers;
 using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.SharedKernel;
@@ -46,7 +47,17 @@ internal sealed class CreateProjectCommandHandler(
 
         project.Raise(new ProjectCreatedDomainEvent(project.Id));
 
+        var projectMember = new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = project.Id,
+            UserId = userContext.UserId!.Value,
+            Role = UserRole.ProjectManager,
+            JoinedAt = DateTimeOffset.UtcNow
+        };
+
         await context.Projects.AddAsync(project, cancellationToken);
+        await context.ProjectMembers.AddAsync(projectMember, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
 

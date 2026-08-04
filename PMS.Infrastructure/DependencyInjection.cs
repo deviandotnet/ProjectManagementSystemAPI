@@ -3,9 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
+using PMS.Domain.Users;
 using PMS.Infrastructure.Authentication;
+using PMS.Infrastructure.Authorization;
 using PMS.Infrastructure.Database;
 using PMS.Infrastructure.Interceptors;
 using PMS.Infrastructure.Repository;
@@ -74,6 +77,23 @@ namespace PMS.Infrastructure
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
                     };
                 });
+
+            services.AddScoped<IAuthorizationHandler, ProjectRoleAuthorizationHandler>();
+
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("RequireProjectAdmin", policy =>
+                    policy.Requirements.Add(new ProjectRoleRequirement(UserRole.Admin)));
+
+                options.AddPolicy("RequireProjectManager", policy =>
+                    policy.Requirements.Add(new ProjectRoleRequirement(UserRole.ProjectManager)));
+
+                options.AddPolicy("RequireProjectTeamLeader", policy =>
+                    policy.Requirements.Add(new ProjectRoleRequirement(UserRole.TeamLeader)));
+
+                options.AddPolicy("RequireProjectMember", policy =>
+                    policy.Requirements.Add(new ProjectRoleRequirement(UserRole.Member)));
+            });
 
             return services;
         }

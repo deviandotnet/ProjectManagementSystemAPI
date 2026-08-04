@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PMS.API;
 using PMS.API.Endpoints.Projects;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Domain.ProjectMembers;
 using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.Infrastructure.Database;
@@ -111,7 +112,7 @@ public class UpdateProjectIntegrationTests : IClassFixture<WebApplicationFactory
         HttpResponseMessage response = await client.PutAsJsonAsync($"api/projects/{nonExistentId}", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -133,7 +134,16 @@ public class UpdateProjectIntegrationTests : IClassFixture<WebApplicationFactory
                 EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(10)),
                 CreatedByUserId = user.Id
             };
+            var member = new ProjectMember
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                UserId = user.Id,
+                Role = UserRole.ProjectManager,
+                JoinedAt = DateTimeOffset.UtcNow
+            };
             context.Projects.Add(project);
+            context.ProjectMembers.Add(member);
             await context.SaveChangesAsync();
         }
 

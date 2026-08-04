@@ -28,6 +28,8 @@ internal sealed class GetProjectsByUserId : IApiEndpoint
                 CustomResults.Problem);
         })
         .RequireAuthorization()
+        .WithSummary("Get Projects by User ID")
+        .WithDescription("Retrieves all projects created by or associated with a specific user ID.")
         .WithTags(Tags.Projects);
     }
 }

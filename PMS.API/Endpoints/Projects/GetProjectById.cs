@@ -28,6 +28,8 @@ internal sealed class GetProjectById : IApiEndpoint
                 CustomResults.Problem);
         })
         .RequireAuthorization()
+        .WithSummary("Get Project by ID")
+        .WithDescription("Retrieves detailed configuration and status information for a specific project by project ID.")
         .WithTags(Tags.Projects);
     }
 }

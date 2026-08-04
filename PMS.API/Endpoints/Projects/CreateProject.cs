@@ -45,6 +45,8 @@ internal sealed class CreateProject : IApiEndpoint
                 CustomResults.Problem);
         })
         .RequireAuthorization()
+        .WithSummary("Create Project")
+        .WithDescription("Creates a new project with custom calendar and timeline configuration. Automatically registers the creator as ProjectManager in project members.")
         .WithTags(Tags.Projects);
     }
 }

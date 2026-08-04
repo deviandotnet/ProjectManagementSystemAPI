@@ -28,8 +28,8 @@ public class AuditInterceptor(IUserContext userContext) : SaveChangesInterceptor
     }
 
     /// <summary>
-    /// Intercepts saves to auto-populate audit timestamps on AuditableBaseEntity instances.
-    /// CreatedAt is set only on Added entries; UpdatedAt is set on every Modified entry.
+    /// Intercepts saves to auto-populate audit timestamps and user IDs on AuditableBaseEntity instances.
+    /// Preserves existing CreatedByUserId/UpdatedByUserId if userContext.UserId is null.
     /// </summary>
     private static void ApplyAuditInfo(DbContext? context, IUserContext userContext)
     {
@@ -38,21 +38,25 @@ public class AuditInterceptor(IUserContext userContext) : SaveChangesInterceptor
 
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var entry in context.ChangeTracker
-                                     .Entries<AuditableBaseEntity>())
+        foreach (var entry in context.ChangeTracker.Entries<AuditableBaseEntity>())
         {
             if (entry.State == EntityState.Added)
             {
                 entry.Entity.CreatedAt = now;
-                entry.Entity.CreatedByUserId = userContext.UserId ?? null; 
+                if (userContext.UserId.HasValue)
+                {
+                    entry.Entity.CreatedByUserId = userContext.UserId;
+                }
             }
 
             if (entry.State == EntityState.Added || entry.State == EntityState.Modified)
             {
                 entry.Entity.UpdatedAt = now;
-                entry.Entity.UpdatedByUserId = userContext.UserId ?? null; 
+                if (userContext.UserId.HasValue)
+                {
+                    entry.Entity.UpdatedByUserId = userContext.UserId;
+                }
             }
         }
     }
-
 }

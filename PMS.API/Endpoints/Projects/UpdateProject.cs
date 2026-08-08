@@ -49,7 +49,7 @@ internal sealed class UpdateProject : IApiEndpoint
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .RequireAuthorization("RequireProjectManager")
+        .RequireAuthorization()
         .WithSummary("Update Project")
         .WithDescription("Updates project settings, timeline scale, progress mode, and status by project ID. Requires ProjectManager role or higher.")
         .WithTags(Tags.Projects);

@@ -19,7 +19,7 @@ internal sealed class CreateProjectCommandHandler(
         CreateProjectCommand command,
         CancellationToken cancellationToken)
     {
-        if (!userContext.IsAuthenticated)
+        if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
             return Result.Failure<Guid>(UserErrors.Unauthorized);
         }

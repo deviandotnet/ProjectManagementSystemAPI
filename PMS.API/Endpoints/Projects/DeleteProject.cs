@@ -27,9 +27,9 @@ internal sealed class DeleteProject : IApiEndpoint
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .RequireAuthorization("RequireProjectAdmin")
+        .RequireAuthorization()
         .WithSummary("Delete Project")
-        .WithDescription("Permanently deletes a project and all associated data by project ID. Requires Project Admin authorization.")
+        .WithDescription("Permanently deletes a project and all associated data by project ID. Requires Project Manager authorization.")
         .WithTags(Tags.Projects);
     }
 }

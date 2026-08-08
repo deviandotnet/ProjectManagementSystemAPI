@@ -49,6 +49,8 @@ public class GetProjectMembersQueryHandlerTests
         await using var context = CreateDbContext();
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
 
         var nonExistentId = Guid.NewGuid();
         var handler = new GetProjectMembersQueryHandler(context, userContext);
@@ -98,6 +100,8 @@ public class GetProjectMembersQueryHandlerTests
 
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
 
         var handler = new GetProjectMembersQueryHandler(context, userContext);
         var query = new GetProjectMembersQuery(project.Id);

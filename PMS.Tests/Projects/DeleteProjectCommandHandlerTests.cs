@@ -52,6 +52,8 @@ public class DeleteProjectCommandHandlerTests
         // Arrange
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
 
         await using var context = CreateDbContext(userContext);
         var unitOfWork = Substitute.For<IUnitOfWork>();
@@ -74,6 +76,7 @@ public class DeleteProjectCommandHandlerTests
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
         userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
 
         await using var context = CreateDbContext(userContext);
 

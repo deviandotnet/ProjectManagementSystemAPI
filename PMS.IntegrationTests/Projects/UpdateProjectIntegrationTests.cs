@@ -112,7 +112,7 @@ public class UpdateProjectIntegrationTests : IClassFixture<WebApplicationFactory
         HttpResponseMessage response = await client.PutAsJsonAsync($"api/projects/{nonExistentId}", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

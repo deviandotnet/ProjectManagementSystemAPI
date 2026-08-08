@@ -59,7 +59,8 @@ public class DeleteProjectIntegrationTests : IClassFixture<WebApplicationFactory
             FirstName = "Integration",
             LastName = "User",
             Email = $"user_{Guid.NewGuid()}@test.com",
-            PasswordHash = "hashedpassword"
+            PasswordHash = "hashedpassword",
+            SystemRole = SystemRole.Admin
         };
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -97,7 +98,7 @@ public class DeleteProjectIntegrationTests : IClassFixture<WebApplicationFactory
         HttpResponseMessage response = await client.DeleteAsync($"api/projects/{nonExistentId}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

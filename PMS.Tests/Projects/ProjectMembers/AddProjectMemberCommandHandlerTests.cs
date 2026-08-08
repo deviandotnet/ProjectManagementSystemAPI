@@ -53,6 +53,8 @@ public class AddProjectMemberCommandHandlerTests
         // Arrange
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
         await using var context = CreateDbContext(userContext);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
@@ -75,6 +77,7 @@ public class AddProjectMemberCommandHandlerTests
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
         userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
         await using var context = CreateDbContext(userContext);
 
         var project = new Project
@@ -108,6 +111,7 @@ public class AddProjectMemberCommandHandlerTests
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
         userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
         await using var context = CreateDbContext(userContext);
 
         var user = new User
@@ -157,6 +161,7 @@ public class AddProjectMemberCommandHandlerTests
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
         userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
         await using var context = CreateDbContext(userContext);
 
         var user = new User

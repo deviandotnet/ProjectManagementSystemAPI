@@ -60,7 +60,8 @@ public class GetProjectByIdIntegrationTests : IClassFixture<WebApplicationFactor
             FirstName = "Integration",
             LastName = "User",
             Email = $"user_{Guid.NewGuid()}@test.com",
-            PasswordHash = "hashedpassword"
+            PasswordHash = "hashedpassword",
+            SystemRole = SystemRole.Admin
         };
         context.Users.Add(user);
         await context.SaveChangesAsync();

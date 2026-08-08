@@ -5,6 +5,7 @@ using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.ProjectMembers.RemoveProjectMember;
 using PMS.Domain.ProjectMembers;
+using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.Infrastructure.Database;
 using PMS.SharedKernel;
@@ -28,12 +29,25 @@ public class RemoveProjectMemberCommandHandlerTests
     {
         // Arrange
         await using var context = CreateDbContext();
-        var userContext = Substitute.For<IUserContext>();
-        userContext.IsAuthenticated.Returns(true);
-        var unitOfWork = Substitute.For<IUnitOfWork>();
-
         var projectId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+
+        var project = new Project
+        {
+            Id = projectId,
+            Name = "Test Project",
+            CreatedByUserId = Guid.NewGuid(),
+            StartDate = DateOnly.FromDateTime(DateTime.Today),
+            EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(10))
+        };
+        context.Projects.Add(project);
+        await context.SaveChangesAsync();
+
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
+        var unitOfWork = Substitute.For<IUnitOfWork>();
 
         var handler = new RemoveProjectMemberCommandHandler(context, unitOfWork, userContext);
         var command = new RemoveProjectMemberCommand(projectId, userId);
@@ -54,6 +68,14 @@ public class RemoveProjectMemberCommandHandlerTests
         var projectId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
+        var project = new Project
+        {
+            Id = projectId,
+            Name = "Test Project",
+            CreatedByUserId = Guid.NewGuid(),
+            StartDate = DateOnly.FromDateTime(DateTime.Today),
+            EndDate = DateOnly.FromDateTime(DateTime.Today.AddDays(10))
+        };
         var member = new ProjectMember
         {
             Id = Guid.NewGuid(),
@@ -61,11 +83,14 @@ public class RemoveProjectMemberCommandHandlerTests
             UserId = userId,
             Role = UserRole.Member
         };
+        context.Projects.Add(project);
         context.ProjectMembers.Add(member);
         await context.SaveChangesAsync();
 
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
         var handler = new RemoveProjectMemberCommandHandler(context, unitOfWork, userContext);

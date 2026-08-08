@@ -61,6 +61,7 @@ public class CreateProjectCommandHandlerTests
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
         userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
 
         await using var context = CreateDbContext(userContext);
         var existingProject = new Project
@@ -101,6 +102,7 @@ public class CreateProjectCommandHandlerTests
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(true);
         userContext.UserId.Returns(authenticatedUserId);
+        userContext.IsSystemAdmin.Returns(true);
 
         await using var context = CreateDbContext(userContext);
         var handler = new CreateProjectCommandHandler(context, unitOfWork, userContext);

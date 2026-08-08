@@ -26,7 +26,7 @@ internal sealed class GetProjectMembers : IApiEndpoint
                 members => Results.Ok(members),
                 CustomResults.Problem);
         })
-        .RequireAuthorization("RequireProjectMember")
+        .RequireAuthorization()
         .WithSummary("Get Project Members")
         .WithDescription("Retrieves all members assigned to the specified project along with their names, emails, project-level roles, and join dates. Requires Project Member authorization.")
         .WithTags(Tags.Projects);

@@ -42,6 +42,11 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(500);
 
+        builder.Property(u => u.SystemRole)
+            .IsRequired()
+            .HasConversion<byte>()
+            .HasDefaultValue(SystemRole.User);
+
         builder.Property(u => u.IsActive)
             .HasDefaultValue(true);
 
@@ -50,6 +55,5 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasDefaultValueSql("now() at time zone 'utc'");
 
         builder.Property(u => u.UpdatedAt);
-
     }
 }

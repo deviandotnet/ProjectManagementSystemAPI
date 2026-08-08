@@ -7,7 +7,7 @@ namespace PMS.Domain.Users
 {
     /// <summary>
     /// Registered user account. Authentication uses JWT.
-    /// One user can be a member of multiple projects with different roles per project.
+    /// Has a global SystemRole (User or Admin) and per-project roles via ProjectMember.
     /// </summary>
     public class User : AuditableBaseEntity
     {
@@ -17,7 +17,12 @@ namespace PMS.Domain.Users
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
+        public SystemRole SystemRole { get; set; } = SystemRole.User;
         public bool IsActive { get; set; } = true;
 
+        // Navigation Properties
+        public virtual ICollection<ProjectMember> ProjectMembers { get; set; } = new List<ProjectMember>();
+        public virtual ICollection<ActionItem> OwnedActionItems { get; set; } = new List<ActionItem>();
+        public virtual ICollection<ActualExecution> CompletedExecutions { get; set; } = new List<ActualExecution>();
     }
 }

@@ -1,3 +1,4 @@
+using PMS.Domain.Users;
 using System;
 
 namespace PMS.Application.Abstractions.Authentication
@@ -6,5 +7,7 @@ namespace PMS.Application.Abstractions.Authentication
     {
         Guid? UserId { get; }
         bool IsAuthenticated { get; }
+        SystemRole? SystemRole { get; }
+        bool IsSystemAdmin { get; }
     }
 }

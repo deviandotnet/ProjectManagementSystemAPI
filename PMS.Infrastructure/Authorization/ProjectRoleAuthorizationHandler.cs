@@ -23,6 +23,13 @@ public class ProjectRoleAuthorizationHandler(
             return;
         }
 
+        // SystemAdmin bypasses all project-level role checks
+        if (userContext.IsSystemAdmin)
+        {
+            context.Succeed(requirement);
+            return;
+        }
+
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext is null)
         {

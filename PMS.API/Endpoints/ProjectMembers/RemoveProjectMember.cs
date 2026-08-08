@@ -27,7 +27,7 @@ internal sealed class RemoveProjectMember : IApiEndpoint
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .RequireAuthorization("RequireProjectManager")
+        .RequireAuthorization()
         .WithSummary("Remove Project Member")
         .WithDescription("Removes a member from the specified project by project ID and user ID. Requires ProjectManager authorization.")
         .WithTags(Tags.Projects);

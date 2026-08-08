@@ -19,7 +19,7 @@ internal sealed class AddProjectMemberCommandHandler(
         AddProjectMemberCommand command,
         CancellationToken cancellationToken)
     {
-        if (!userContext.IsAuthenticated)
+        if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
             return Result.Failure(UserErrors.Unauthorized);
         }
@@ -30,6 +30,23 @@ internal sealed class AddProjectMemberCommandHandler(
         if (!projectExists)
         {
             return Result.Failure(ProjectErrors.NotFound(command.ProjectId));
+        }
+
+        if (!userContext.IsSystemAdmin)
+        {
+            ProjectMember? callerMember = await context.ProjectMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(pm => pm.ProjectId == command.ProjectId && pm.UserId == userContext.UserId.Value, cancellationToken);
+
+            if (callerMember is null)
+            {
+                return Result.Failure(ProjectMemberErrors.NotProjectMember);
+            }
+
+            if ((int)callerMember.Role > (int)UserRole.ProjectManager)
+            {
+                return Result.Failure(ProjectMemberErrors.Forbidden);
+            }
         }
 
         bool userExists = await context.Users

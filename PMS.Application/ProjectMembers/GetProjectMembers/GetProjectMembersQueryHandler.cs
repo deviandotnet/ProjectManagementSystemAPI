@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
+using PMS.Domain.ProjectMembers;
 using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.SharedKernel;
@@ -17,7 +18,7 @@ internal sealed class GetProjectMembersQueryHandler(
         GetProjectMembersQuery query,
         CancellationToken cancellationToken)
     {
-        if (!userContext.IsAuthenticated)
+        if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
             return Result.Failure<List<ProjectMemberResponse>>(UserErrors.Unauthorized);
         }
@@ -28,6 +29,17 @@ internal sealed class GetProjectMembersQueryHandler(
         if (!projectExists)
         {
             return Result.Failure<List<ProjectMemberResponse>>(ProjectErrors.NotFound(query.ProjectId));
+        }
+
+        if (!userContext.IsSystemAdmin)
+        {
+            bool isMember = await context.ProjectMembers
+                .AnyAsync(pm => pm.ProjectId == query.ProjectId && pm.UserId == userContext.UserId.Value, cancellationToken);
+
+            if (!isMember)
+            {
+                return Result.Failure<List<ProjectMemberResponse>>(ProjectMemberErrors.NotProjectMember);
+            }
         }
 
         List<ProjectMemberResponse> members = await (

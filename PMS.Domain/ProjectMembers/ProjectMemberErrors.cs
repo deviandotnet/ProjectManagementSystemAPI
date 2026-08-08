@@ -15,4 +15,12 @@ public static class ProjectMemberErrors
     public static readonly Error InvalidRole = Error.Problem(
         "ProjectMembers.InvalidRole",
         "The specified user role is invalid.");
+
+    public static readonly Error Forbidden = Error.Failure(
+        "ProjectMembers.Forbidden",
+        "You do not have permission to manage project members.");
+
+    public static readonly Error NotProjectMember = Error.Failure(
+        "ProjectMembers.NotProjectMember",
+        "You must be a member of the project to access this resource.");
 }

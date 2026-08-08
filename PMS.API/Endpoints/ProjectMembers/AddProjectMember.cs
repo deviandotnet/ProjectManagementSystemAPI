@@ -30,7 +30,7 @@ internal sealed class AddProjectMember : IApiEndpoint
                 () => Results.Created($"/api/projects/{id}/members", null),
                 CustomResults.Problem);
         })
-        .RequireAuthorization("RequireProjectManager")
+        .RequireAuthorization()
         .WithSummary("Add Project Member")
         .WithDescription("Assigns a registered user to the specified project with a project-level role (`Admin`, `ProjectManager`, `TeamLeader`, `Member`, `Viewer`). Requires ProjectManager authorization.")
         .WithTags(Tags.Projects);

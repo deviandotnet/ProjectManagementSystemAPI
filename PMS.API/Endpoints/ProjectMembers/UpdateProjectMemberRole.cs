@@ -31,7 +31,7 @@ internal sealed class UpdateProjectMemberRole : IApiEndpoint
                 () => Results.NoContent(),
                 CustomResults.Problem);
         })
-        .RequireAuthorization("RequireProjectManager")
+        .RequireAuthorization()
         .WithSummary("Update Project Member Role")
         .WithDescription("Updates an existing project member's role (`Admin`, `ProjectManager`, `TeamLeader`, `Member`, `Viewer`) by project ID and user ID. Requires ProjectManager authorization.")
         .WithTags(Tags.Projects);

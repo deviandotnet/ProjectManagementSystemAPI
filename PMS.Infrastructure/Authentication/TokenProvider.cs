@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Domain.Users;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -34,12 +35,14 @@ namespace PMS.Infrastructure.Authentication
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new System.Security.Claims.ClaimsIdentity(
+                Subject = new ClaimsIdentity(
                 [
-                    new System.Security.Claims.Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                    new System.Security.Claims.Claim(JwtRegisteredClaimNames.Email, user.Email),
-                    new System.Security.Claims.Claim(JwtRegisteredClaimNames.GivenName, user.FirstName),
-                    new System.Security.Claims.Claim(JwtRegisteredClaimNames.FamilyName, user.LastName)
+                    new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                    new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                    new Claim(JwtRegisteredClaimNames.GivenName, user.FirstName),
+                    new Claim(JwtRegisteredClaimNames.FamilyName, user.LastName),
+                    new Claim("system_role", user.SystemRole.ToString()),
+                    new Claim(ClaimTypes.Role, user.SystemRole.ToString())
                 ]),
                 Expires = DateTime.UtcNow.AddMinutes(expirationMinutes),
                 SigningCredentials = credentials,
@@ -52,7 +55,6 @@ namespace PMS.Infrastructure.Authentication
             string accessToken = handler.CreateToken(tokenDescriptor);
 
             return accessToken;
-
         }
 
         public string CreateRefreshToken()

@@ -5,4 +5,5 @@ public static class Tags
     public const string Projects = "projects";
     public const string Users = "users";
     public const string ActionItems = "actionitems";
+    public const string Categories = "categories";
 }

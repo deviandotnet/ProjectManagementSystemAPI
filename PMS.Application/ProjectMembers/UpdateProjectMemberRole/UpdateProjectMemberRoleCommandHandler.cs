@@ -3,6 +3,7 @@ using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ProjectMembers;
+using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.SharedKernel;
 
@@ -18,9 +19,34 @@ internal sealed class UpdateProjectMemberRoleCommandHandler(
         UpdateProjectMemberRoleCommand command,
         CancellationToken cancellationToken)
     {
-        if (!userContext.IsAuthenticated)
+        if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
             return Result.Failure(UserErrors.Unauthorized);
+        }
+
+        bool projectExists = await context.Projects
+            .AnyAsync(p => p.Id == command.ProjectId, cancellationToken);
+
+        if (!projectExists)
+        {
+            return Result.Failure(ProjectErrors.NotFound(command.ProjectId));
+        }
+
+        if (!userContext.IsSystemAdmin)
+        {
+            ProjectMember? callerMember = await context.ProjectMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(pm => pm.ProjectId == command.ProjectId && pm.UserId == userContext.UserId.Value, cancellationToken);
+
+            if (callerMember is null)
+            {
+                return Result.Failure(ProjectMemberErrors.NotProjectMember);
+            }
+
+            if ((int)callerMember.Role > (int)UserRole.ProjectManager)
+            {
+                return Result.Failure(ProjectMemberErrors.Forbidden);
+            }
         }
 
         ProjectMember? member = await context.ProjectMembers

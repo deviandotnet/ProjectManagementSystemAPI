@@ -57,6 +57,8 @@ internal sealed class RemoveProjectMemberCommandHandler(
             return Result.Failure(ProjectMemberErrors.NotFound(command.ProjectId, command.UserId));
         }
 
+        member.Raise(new ProjectMemberRemovedDomainEvent(member.Id, member.ProjectId, member.UserId));
+
         context.ProjectMembers.Remove(member);
 
         await context.SaveChangesAsync(cancellationToken);

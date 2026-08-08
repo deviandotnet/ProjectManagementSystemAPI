@@ -74,6 +74,8 @@ internal sealed class AddProjectMemberCommandHandler(
             JoinedAt = DateTimeOffset.UtcNow
         };
 
+        member.Raise(new ProjectMemberAddedDomainEvent(member.Id, member.ProjectId, member.UserId));
+
         await context.ProjectMembers.AddAsync(member, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);

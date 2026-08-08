@@ -57,6 +57,8 @@ internal sealed class UpdateProjectMemberRoleCommandHandler(
             return Result.Failure(ProjectMemberErrors.NotFound(command.ProjectId, command.UserId));
         }
 
+        member.Raise(new ProjectMemberRoleUpdatedDomainEvent(member.Id, member.ProjectId, member.UserId, command.Role));
+
         member.Role = command.Role;
 
         await context.SaveChangesAsync(cancellationToken);

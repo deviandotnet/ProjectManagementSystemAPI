@@ -4,7 +4,8 @@ namespace PMS.SharedKernel
     {
         Daily = 1,
         Weekly = 2,
-        Monthly = 3,
-        Quarterly = 4,
+        Biweekly = 3,
+        Monthly = 4,
+        Quarterly = 5
     }
 }

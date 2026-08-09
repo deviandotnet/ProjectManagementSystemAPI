@@ -3,9 +3,9 @@ name: CI/CD Pipeline
 on:
   workflow_dispatch: 
   push:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "main" ]
 
 env:
   DOTNET_VERSION: "10.0.x"
@@ -35,7 +35,7 @@ jobs:
   deploy:
     name: Deploy to Production Cloud (Render)
     needs: build-and-test
-    if: (github.ref == 'refs/heads/master') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
     - name: Trigger Deploy Hook on Render

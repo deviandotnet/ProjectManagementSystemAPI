@@ -5,6 +5,7 @@ COPY ["PMS.API/PMS.API.csproj", "PMS.API/"]
 COPY ["PMS.Application/PMS.Application.csproj", "PMS.Application/"]
 COPY ["PMS.Domain/PMS.Domain.csproj", "PMS.Domain/"]
 COPY ["PMS.Infrastructure/PMS.Infrastructure.csproj", "PMS.Infrastructure/"]
+COPY ["PMS.SharedKernel/PMS.SharedKernel.csproj", "PMS.SharedKernel/"]
 RUN dotnet restore "PMS.API/PMS.API.csproj"
 
 COPY . .

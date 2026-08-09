@@ -28,9 +28,5 @@ namespace PMS.API.Extensions
             return app;
         }
 
-        public static IApplicationBuilder UseSwaggerWithUi(this WebApplication app)
-        {
-            return app.UseScalarWithUi();
-        }
     }
 }

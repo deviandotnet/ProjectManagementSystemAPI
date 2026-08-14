@@ -1,7 +1,8 @@
-using PMS.Application.Abstractions.Messaging;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Serilog.Context;
+using PMS.Application.Abstractions.Messaging;
 using PMS.SharedKernel;
+using Serilog.Context;
 
 namespace PMS.Application.Abstractions.Behaviors;
 
@@ -19,17 +20,26 @@ internal static class LoggingDecorator
 
             logger.LogInformation("Processing command {Command}", commandName);
 
+            var stopwatch = Stopwatch.StartNew();
             Result<TResponse> result = await innerHandler.Handle(command, cancellationToken);
+            stopwatch.Stop();
 
             if (result.IsSuccess)
             {
-                logger.LogInformation("Completed command {Command}", commandName);
+                logger.LogInformation(
+                    "Completed command {Command} in {ElapsedMilliseconds} ms",
+                    commandName,
+                    stopwatch.ElapsedMilliseconds);
             }
             else
             {
-                using (LogContext.PushProperty("Error", result.Error, true))
+                using (LogContext.PushProperty("ErrorCode", result.Error.Code))
                 {
-                    logger.LogError("Completed command {Command} with error", commandName);
+                    logger.LogError(
+                        "Completed command {Command} with error ({ErrorCode}) in {ElapsedMilliseconds} ms",
+                        commandName,
+                        result.Error.Code,
+                        stopwatch.ElapsedMilliseconds);
                 }
             }
 
@@ -49,17 +59,26 @@ internal static class LoggingDecorator
 
             logger.LogInformation("Processing command {Command}", commandName);
 
+            var stopwatch = Stopwatch.StartNew();
             Result result = await innerHandler.Handle(command, cancellationToken);
+            stopwatch.Stop();
 
             if (result.IsSuccess)
             {
-                logger.LogInformation("Completed command {Command}", commandName);
+                logger.LogInformation(
+                    "Completed command {Command} in {ElapsedMilliseconds} ms",
+                    commandName,
+                    stopwatch.ElapsedMilliseconds);
             }
             else
             {
-                using (LogContext.PushProperty("Error", result.Error, true))
+                using (LogContext.PushProperty("ErrorCode", result.Error.Code))
                 {
-                    logger.LogError("Completed command {Command} with error", commandName);
+                    logger.LogError(
+                        "Completed command {Command} with error ({ErrorCode}) in {ElapsedMilliseconds} ms",
+                        commandName,
+                        result.Error.Code,
+                        stopwatch.ElapsedMilliseconds);
                 }
             }
 
@@ -79,17 +98,26 @@ internal static class LoggingDecorator
 
             logger.LogInformation("Processing query {Query}", queryName);
 
+            var stopwatch = Stopwatch.StartNew();
             Result<TResponse> result = await innerHandler.Handle(query, cancellationToken);
+            stopwatch.Stop();
 
             if (result.IsSuccess)
             {
-                logger.LogInformation("Completed query {Query}", queryName);
+                logger.LogInformation(
+                    "Completed query {Query} in {ElapsedMilliseconds} ms",
+                    queryName,
+                    stopwatch.ElapsedMilliseconds);
             }
             else
             {
-                using (LogContext.PushProperty("Error", result.Error, true))
+                using (LogContext.PushProperty("ErrorCode", result.Error.Code))
                 {
-                    logger.LogError("Completed query {Query} with error", queryName);
+                    logger.LogError(
+                        "Completed query {Query} with error ({ErrorCode}) in {ElapsedMilliseconds} ms",
+                        queryName,
+                        result.Error.Code,
+                        stopwatch.ElapsedMilliseconds);
                 }
             }
 

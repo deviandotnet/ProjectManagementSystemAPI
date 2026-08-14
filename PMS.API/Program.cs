@@ -16,6 +16,7 @@ namespace PMS.API
 
             var builder = WebApplication.CreateBuilder(args);
             builder.Configuration.AddEnvironmentVariables();
+            builder.AddSerilogLogging();
 
             // Configure Forwarded Headers for Proxy (Render)
             builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -38,12 +39,6 @@ namespace PMS.API
 
             // Application (Handlers + Validators)
             builder.Services.AddApplication();
-
-            // JSON Options (Enum support)
-            builder.Services.ConfigureHttpJsonOptions(options =>
-            {
-                options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-            });
 
             // API Endpoints
             builder.Services.RegisterApiEndpointsFromAssembly(typeof(Program).Assembly);
@@ -72,6 +67,7 @@ namespace PMS.API
 
             // Middleware Pipeline
             app.UseCors();
+            app.UseApiRequestLogging();
 
             // Auto-discover and register all Minimal API endpoints
             app.MapApiEndpoints();

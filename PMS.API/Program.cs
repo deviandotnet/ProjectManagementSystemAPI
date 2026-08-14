@@ -39,6 +39,12 @@ namespace PMS.API
             // Application (Handlers + Validators)
             builder.Services.AddApplication();
 
+            // JSON Options (Enum support)
+            builder.Services.ConfigureHttpJsonOptions(options =>
+            {
+                options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            });
+
             // API Endpoints
             builder.Services.RegisterApiEndpointsFromAssembly(typeof(Program).Assembly);
 

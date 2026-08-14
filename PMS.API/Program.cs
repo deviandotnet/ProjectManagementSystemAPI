@@ -49,6 +49,7 @@ namespace PMS.API
             // API Services 
             builder.Services.AddAuthorization();
             builder.Services.AddOpenApiWithAuth();
+            builder.Services.AddApiHealthChecks();
 
             var app = builder.Build();
 
@@ -68,6 +69,9 @@ namespace PMS.API
             // Middleware Pipeline
             app.UseCors();
             app.UseApiRequestLogging();
+
+            // Health Check Endpoints (/health, /health/live, /health/ready)
+            app.MapApiHealthChecks();
 
             // Auto-discover and register all Minimal API endpoints
             app.MapApiEndpoints();

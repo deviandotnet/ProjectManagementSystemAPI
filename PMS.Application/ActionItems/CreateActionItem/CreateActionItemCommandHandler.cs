@@ -18,7 +18,8 @@ namespace PMS.Application.ActionItems.CreateActionItem;
 internal sealed class CreateActionItemCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<CreateActionItemCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(
@@ -112,7 +113,7 @@ internal sealed class CreateActionItemCommandHandler(
             Sequence = command.Sequence,
             Remarks = command.Remarks,
             CreatedByUserId = userId,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = dateTimeProvider.UtcNow
         };
 
         var plannedSchedule = new PlannedSchedule
@@ -125,7 +126,7 @@ internal sealed class CreateActionItemCommandHandler(
             PlannedEndWeek = plannedEndWeek,
             DurationCalendarDays = durationCalendarDays,
             DurationWorkingDays = durationWorkingDays,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = dateTimeProvider.UtcNow
         };
 
         ActualExecution? actualExecution = null;
@@ -141,7 +142,7 @@ internal sealed class CreateActionItemCommandHandler(
                 CompletedByName = command.ActualEndDate.HasValue ? command.OwnerName : null,
                 CompletedById = command.ActualEndDate.HasValue ? command.OwnerId : null,
                 DelayReason = command.DelayReason,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = dateTimeProvider.UtcNow
             };
         }
 

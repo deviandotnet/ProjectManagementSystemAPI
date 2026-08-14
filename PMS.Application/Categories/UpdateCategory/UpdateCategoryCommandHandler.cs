@@ -12,7 +12,8 @@ namespace PMS.Application.Categories.UpdateCategory;
 internal sealed class UpdateCategoryCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<UpdateCategoryCommand>
 {
     public async Task<Result> Handle(
@@ -66,7 +67,7 @@ internal sealed class UpdateCategoryCommandHandler(
         category.DisplayOrder = command.DisplayOrder;
         category.Color = command.Color;
         category.UpdatedByUserId = userId;
-        category.UpdatedAt = DateTimeOffset.UtcNow;
+        category.UpdatedAt = dateTimeProvider.UtcNow;
 
         category.Raise(new CategoryUpdatedDomainEvent(category.Id));
 

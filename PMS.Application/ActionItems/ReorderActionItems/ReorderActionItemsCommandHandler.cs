@@ -13,7 +13,8 @@ namespace PMS.Application.ActionItems.ReorderActionItems;
 internal sealed class ReorderActionItemsCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<ReorderActionItemsCommand>
 {
     public async Task<Result> Handle(
@@ -60,7 +61,7 @@ internal sealed class ReorderActionItemsCommandHandler(
 
         Dictionary<Guid, int> sequenceMap = command.Items.ToDictionary(i => i.ActionItemId, i => i.Sequence);
 
-        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = dateTimeProvider.UtcNow;
         foreach (ActionItem actionItem in actionItems)
         {
             if (sequenceMap.TryGetValue(actionItem.Id, out int newSequence))

@@ -13,7 +13,8 @@ namespace PMS.Application.Categories.CreateCategory;
 internal sealed class CreateCategoryCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<CreateCategoryCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(
@@ -62,7 +63,7 @@ internal sealed class CreateCategoryCommandHandler(
             DisplayOrder = command.DisplayOrder,
             Color = command.Color,
             CreatedByUserId = userId,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = dateTimeProvider.UtcNow
         };
 
         category.Raise(new CategoryCreatedDomainEvent(category.Id));

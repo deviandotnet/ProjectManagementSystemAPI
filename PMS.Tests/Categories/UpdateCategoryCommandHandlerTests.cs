@@ -57,7 +57,10 @@ public class UpdateCategoryCommandHandlerTests
         userContext.UserId.Returns(userId);
         userContext.IsSystemAdmin.Returns(false);
 
-        var handler = new UpdateCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new UpdateCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new UpdateCategoryCommand(projectId, category.Id, "Updated Name", 2, "#FF0000");
 
         // Act
@@ -101,7 +104,10 @@ public class UpdateCategoryCommandHandlerTests
         userContext.UserId.Returns(otherUserId);
         userContext.IsSystemAdmin.Returns(false);
 
-        var handler = new UpdateCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new UpdateCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new UpdateCategoryCommand(projectId, category.Id, "Hacked Name", 2, "#FF0000");
 
         // Act
@@ -145,7 +151,10 @@ public class UpdateCategoryCommandHandlerTests
         userContext.UserId.Returns(adminUserId);
         userContext.IsSystemAdmin.Returns(false);
 
-        var handler = new UpdateCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new UpdateCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new UpdateCategoryCommand(projectId, category.Id, "Admin Updated Name", 2, "#FF0000");
 
         // Act

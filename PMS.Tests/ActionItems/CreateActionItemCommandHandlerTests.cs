@@ -37,7 +37,10 @@ public class CreateActionItemCommandHandlerTests
         userContext.IsAuthenticated.Returns(false);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var handler = new CreateActionItemCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateActionItemCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateActionItemCommand(
             Guid.NewGuid(), Guid.NewGuid(), null, "Task", null,
             Priority.Medium, null, null, null, 1, null,
@@ -62,7 +65,10 @@ public class CreateActionItemCommandHandlerTests
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
         var nonExistentProjectId = Guid.NewGuid();
-        var handler = new CreateActionItemCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateActionItemCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateActionItemCommand(
             nonExistentProjectId, Guid.NewGuid(), null, "Task", null,
             Priority.Medium, null, null, null, 1, null,
@@ -102,7 +108,10 @@ public class CreateActionItemCommandHandlerTests
         userContext.IsSystemAdmin.Returns(false);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var handler = new CreateActionItemCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateActionItemCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateActionItemCommand(
             projectId, Guid.NewGuid(), null, "Task", null,
             Priority.Medium, null, null, null, 1, null,
@@ -147,7 +156,10 @@ public class CreateActionItemCommandHandlerTests
         userContext.IsSystemAdmin.Returns(false);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var handler = new CreateActionItemCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateActionItemCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateActionItemCommand(
             projectId, categoryId, null, "Setup Database", "Initialize EF Core schemas",
             Priority.High, "John Developer", userId, 15.5m, 1, "High Priority Task",

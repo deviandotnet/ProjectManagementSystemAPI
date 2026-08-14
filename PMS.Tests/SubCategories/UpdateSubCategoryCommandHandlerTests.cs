@@ -35,7 +35,10 @@ public class UpdateSubCategoryCommandHandlerTests
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
         var nonExistentSubId = Guid.NewGuid();
-        var handler = new UpdateSubCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new UpdateSubCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new UpdateSubCategoryCommand(Guid.NewGuid(), nonExistentSubId, "Updated Sub", 1);
 
         // Act
@@ -67,7 +70,10 @@ public class UpdateSubCategoryCommandHandlerTests
         userContext.IsSystemAdmin.Returns(true);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var handler = new UpdateSubCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new UpdateSubCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new UpdateSubCategoryCommand(categoryId, subCategoryId, "Updated Name", 5);
 
         // Act

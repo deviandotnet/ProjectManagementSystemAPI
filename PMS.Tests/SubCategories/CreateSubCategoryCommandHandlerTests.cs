@@ -33,7 +33,10 @@ public class CreateSubCategoryCommandHandlerTests
         userContext.IsAuthenticated.Returns(false);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var handler = new CreateSubCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateSubCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateSubCategoryCommand(Guid.NewGuid(), "New Sub");
 
         // Act
@@ -55,7 +58,10 @@ public class CreateSubCategoryCommandHandlerTests
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
         var nonExistentCategoryId = Guid.NewGuid();
-        var handler = new CreateSubCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateSubCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateSubCategoryCommand(nonExistentCategoryId, "New Sub");
 
         // Act
@@ -83,7 +89,10 @@ public class CreateSubCategoryCommandHandlerTests
         userContext.IsSystemAdmin.Returns(true);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var handler = new CreateSubCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateSubCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateSubCategoryCommand(categoryId, "Created SubCategory", 1);
 
         // Act

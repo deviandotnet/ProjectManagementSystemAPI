@@ -35,7 +35,10 @@ public class ReorderActionItemsCommandHandlerTests
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(false);
 
-        var handler = new ReorderActionItemsCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new ReorderActionItemsCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new ReorderActionItemsCommand(Guid.NewGuid(), []);
 
         // Act
@@ -84,7 +87,10 @@ public class ReorderActionItemsCommandHandlerTests
         userContext.IsAuthenticated.Returns(true);
         userContext.UserId.Returns(userId);
 
-        var handler = new ReorderActionItemsCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new ReorderActionItemsCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new ReorderActionItemsCommand(project.Id,
         [
             new ReorderActionItemItem(item1.Id, 5),

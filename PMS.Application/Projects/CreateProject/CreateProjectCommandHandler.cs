@@ -12,7 +12,8 @@ namespace PMS.Application.Projects.CreateProject;
 internal sealed class CreateProjectCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<CreateProjectCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(
@@ -53,7 +54,7 @@ internal sealed class CreateProjectCommandHandler(
             ProjectId = project.Id,
             UserId = userContext.UserId!.Value,
             Role = UserRole.ProjectManager,
-            JoinedAt = DateTimeOffset.UtcNow
+            JoinedAt = dateTimeProvider.UtcNow
         };
 
         await context.Projects.AddAsync(project, cancellationToken);

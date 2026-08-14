@@ -36,7 +36,10 @@ public class AddProjectMemberCommandHandlerTests
         await using var context = CreateDbContext(userContext);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new AddProjectMemberCommand(Guid.NewGuid(), Guid.NewGuid(), UserRole.Member);
 
         // Act
@@ -59,7 +62,10 @@ public class AddProjectMemberCommandHandlerTests
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
         var nonExistentProjectId = Guid.NewGuid();
-        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new AddProjectMemberCommand(nonExistentProjectId, Guid.NewGuid(), UserRole.Member);
 
         // Act
@@ -93,7 +99,10 @@ public class AddProjectMemberCommandHandlerTests
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
         var nonExistentUserId = Guid.NewGuid();
-        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new AddProjectMemberCommand(project.Id, nonExistentUserId, UserRole.Member);
 
         // Act
@@ -143,7 +152,10 @@ public class AddProjectMemberCommandHandlerTests
         await context.SaveChangesAsync();
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new AddProjectMemberCommand(project.Id, user.Id, UserRole.TeamLeader);
 
         // Act
@@ -185,7 +197,10 @@ public class AddProjectMemberCommandHandlerTests
         await context.SaveChangesAsync();
 
         var unitOfWork = Substitute.For<IUnitOfWork>();
-        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new AddProjectMemberCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new AddProjectMemberCommand(project.Id, user.Id, UserRole.TeamLeader);
 
         // Act

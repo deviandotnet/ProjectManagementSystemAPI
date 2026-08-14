@@ -12,7 +12,8 @@ namespace PMS.Application.ProjectMembers.AddProjectMember;
 internal sealed class AddProjectMemberCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<AddProjectMemberCommand>
 {
     public async Task<Result> Handle(
@@ -71,7 +72,7 @@ internal sealed class AddProjectMemberCommandHandler(
             ProjectId = command.ProjectId,
             UserId = command.UserId,
             Role = command.Role,
-            JoinedAt = DateTimeOffset.UtcNow
+            JoinedAt = dateTimeProvider.UtcNow
         };
 
         member.Raise(new ProjectMemberAddedDomainEvent(member.Id, member.ProjectId, member.UserId));

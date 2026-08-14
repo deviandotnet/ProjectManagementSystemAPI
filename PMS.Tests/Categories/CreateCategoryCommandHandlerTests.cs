@@ -34,7 +34,10 @@ public class CreateCategoryCommandHandlerTests
         var userContext = Substitute.For<IUserContext>();
         userContext.IsAuthenticated.Returns(false);
 
-        var handler = new CreateCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateCategoryCommand(Guid.NewGuid(), "Planning", 1, "#FFFFFF");
 
         // Act
@@ -56,7 +59,10 @@ public class CreateCategoryCommandHandlerTests
         userContext.UserId.Returns(Guid.NewGuid());
 
         var nonExistentProjectId = Guid.NewGuid();
-        var handler = new CreateCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateCategoryCommand(nonExistentProjectId, "Planning", 1, "#FFFFFF");
 
         // Act
@@ -90,7 +96,10 @@ public class CreateCategoryCommandHandlerTests
         userContext.UserId.Returns(Guid.NewGuid());
         userContext.IsSystemAdmin.Returns(false);
 
-        var handler = new CreateCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateCategoryCommand(project.Id, "Planning", 1, "#FFFFFF");
 
         // Act
@@ -133,7 +142,10 @@ public class CreateCategoryCommandHandlerTests
         userContext.UserId.Returns(userId);
         userContext.IsSystemAdmin.Returns(false);
 
-        var handler = new CreateCategoryCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateCategoryCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new CreateCategoryCommand(project.Id, "Architecture", 1, "#3A86FF");
 
         // Act

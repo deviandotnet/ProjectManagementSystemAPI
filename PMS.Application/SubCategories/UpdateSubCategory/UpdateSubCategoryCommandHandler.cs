@@ -13,7 +13,8 @@ namespace PMS.Application.SubCategories.UpdateSubCategory;
 internal sealed class UpdateSubCategoryCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<UpdateSubCategoryCommand>
 {
     public async Task<Result> Handle(
@@ -72,7 +73,7 @@ internal sealed class UpdateSubCategoryCommandHandler(
         subCategory.Name = command.Name.Trim();
         subCategory.DisplayOrder = command.DisplayOrder;
         subCategory.UpdatedByUserId = userId;
-        subCategory.UpdatedAt = DateTimeOffset.UtcNow;
+        subCategory.UpdatedAt = dateTimeProvider.UtcNow;
 
         subCategory.Raise(new SubCategoryUpdatedDomainEvent(subCategory.Id));
 

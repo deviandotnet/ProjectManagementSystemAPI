@@ -36,7 +36,10 @@ public class CreateProjectCommandHandlerTests
         userContext.UserId.Returns((Guid?)null);
 
         await using var context = CreateDbContext(userContext);
-        var handler = new CreateProjectCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateProjectCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
 
         var command = new CreateProjectCommand(
             Name: "Unauthenticated Project",
@@ -75,7 +78,10 @@ public class CreateProjectCommandHandlerTests
         context.Projects.Add(existingProject);
         await context.SaveChangesAsync();
 
-        var handler = new CreateProjectCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateProjectCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
 
         var command = new CreateProjectCommand(
             Name: "Existing Project",
@@ -105,7 +111,10 @@ public class CreateProjectCommandHandlerTests
         userContext.IsSystemAdmin.Returns(true);
 
         await using var context = CreateDbContext(userContext);
-        var handler = new CreateProjectCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new CreateProjectCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
 
         var command = new CreateProjectCommand(
             Name: "New Super Project",

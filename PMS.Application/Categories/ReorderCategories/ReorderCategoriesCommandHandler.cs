@@ -13,7 +13,8 @@ namespace PMS.Application.Categories.ReorderCategories;
 internal sealed class ReorderCategoriesCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<ReorderCategoriesCommand>
 {
     public async Task<Result> Handle(
@@ -60,7 +61,7 @@ internal sealed class ReorderCategoriesCommandHandler(
 
         Dictionary<Guid, int> orderMap = command.Items.ToDictionary(i => i.CategoryId, i => i.DisplayOrder);
 
-        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = dateTimeProvider.UtcNow;
         foreach (Category category in categories)
         {
             if (orderMap.TryGetValue(category.Id, out int newDisplayOrder))

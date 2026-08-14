@@ -54,7 +54,10 @@ public class UpdateActionItemCommandHandlerTests
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
         var nonExistentActionItemId = Guid.NewGuid();
-        var handler = new UpdateActionItemCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new UpdateActionItemCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new UpdateActionItemCommand(
             projectId, nonExistentActionItemId, Guid.NewGuid(), null, "Task", null,
             Priority.Medium, null, null, null, 1, null,
@@ -109,7 +112,10 @@ public class UpdateActionItemCommandHandlerTests
         userContext.IsSystemAdmin.Returns(false);
         var unitOfWork = Substitute.For<IUnitOfWork>();
 
-        var handler = new UpdateActionItemCommandHandler(context, unitOfWork, userContext);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
+
+        var handler = new UpdateActionItemCommandHandler(context, unitOfWork, userContext, dateTimeProvider);
         var command = new UpdateActionItemCommand(
             projectId, actionItemId, categoryId, null, "Updated Name", "Updated Desc",
             Priority.Critical, "Jane Dev", userId, 20m, 2, "Updated Remarks",

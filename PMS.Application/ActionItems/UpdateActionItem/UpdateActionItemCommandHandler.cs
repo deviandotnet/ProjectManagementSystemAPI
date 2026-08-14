@@ -17,7 +17,8 @@ namespace PMS.Application.ActionItems.UpdateActionItem;
 internal sealed class UpdateActionItemCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<UpdateActionItemCommand>
 {
     public async Task<Result> Handle(
@@ -114,7 +115,7 @@ internal sealed class UpdateActionItemCommandHandler(
         actionItem.Sequence = command.Sequence;
         actionItem.Remarks = command.Remarks;
         actionItem.UpdatedByUserId = userId;
-        actionItem.UpdatedAt = DateTimeOffset.UtcNow;
+        actionItem.UpdatedAt = dateTimeProvider.UtcNow;
 
         PlannedSchedule? schedule = await context.PlannedSchedules
             .SingleOrDefaultAsync(s => s.ActionItemId == actionItem.Id, cancellationToken);
@@ -131,7 +132,7 @@ internal sealed class UpdateActionItemCommandHandler(
                 PlannedEndWeek = plannedEndWeek,
                 DurationCalendarDays = durationCalendarDays,
                 DurationWorkingDays = durationWorkingDays,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = dateTimeProvider.UtcNow
             };
             context.PlannedSchedules.Add(schedule);
         }
@@ -143,7 +144,7 @@ internal sealed class UpdateActionItemCommandHandler(
             schedule.PlannedEndWeek = plannedEndWeek;
             schedule.DurationCalendarDays = durationCalendarDays;
             schedule.DurationWorkingDays = durationWorkingDays;
-            schedule.UpdatedAt = DateTimeOffset.UtcNow;
+            schedule.UpdatedAt = dateTimeProvider.UtcNow;
         }
 
         ActualExecution? execution = await context.ActualExecutions
@@ -163,7 +164,7 @@ internal sealed class UpdateActionItemCommandHandler(
                     CompletedByName = command.ActualEndDate.HasValue ? command.OwnerName : null,
                     CompletedById = command.ActualEndDate.HasValue ? command.OwnerId : null,
                     DelayReason = command.DelayReason,
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = dateTimeProvider.UtcNow
                 };
                 context.ActualExecutions.Add(execution);
             }
@@ -175,7 +176,7 @@ internal sealed class UpdateActionItemCommandHandler(
                 execution.CompletedByName = command.ActualEndDate.HasValue ? command.OwnerName : execution.CompletedByName;
                 execution.CompletedById = command.ActualEndDate.HasValue ? command.OwnerId : execution.CompletedById;
                 execution.DelayReason = command.DelayReason;
-                execution.UpdatedAt = DateTimeOffset.UtcNow;
+                execution.UpdatedAt = dateTimeProvider.UtcNow;
             }
         }
 

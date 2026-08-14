@@ -13,7 +13,8 @@ namespace PMS.Application.SubCategories.CreateSubCategory;
 internal sealed class CreateSubCategoryCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider)
     : ICommandHandler<CreateSubCategoryCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(
@@ -60,7 +61,7 @@ internal sealed class CreateSubCategoryCommandHandler(
             Name = command.Name.Trim(),
             DisplayOrder = command.DisplayOrder,
             CreatedByUserId = userId,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = dateTimeProvider.UtcNow
         };
 
         subCategory.Raise(new SubCategoryCreatedDomainEvent(subCategory.Id));

@@ -76,14 +76,10 @@ namespace PMS.API
             // Auto-discover and register all Minimal API endpoints
             app.MapApiEndpoints();
 
+            // Scalar UI with auth
             app.UseScalarWithUi();
-            app.UseHttpsRedirection();
 
-            //if (app.Environment.IsDevelopment())
-            //{
-            //    app.UseScalarWithUi();
-            //    app.UseHttpsRedirection();
-            //}
+            app.UseHttpsRedirection();
 
             app.UseAuthentication();
             app.UseAuthorization();

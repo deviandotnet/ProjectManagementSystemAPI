@@ -8,4 +8,7 @@ public static class Tags
     public const string Categories = "categories";
     public const string Holidays = "holidays";
     public const string Calendar = "calendar";
+    public const string Dashboard = "dashboard";
+    public const string Audit = "audit";
+    public const string Export = "export";
 }

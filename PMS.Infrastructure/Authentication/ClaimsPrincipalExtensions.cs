@@ -23,6 +23,31 @@ namespace PMS.Infrastructure.Authentication
                 : null;
         }
 
+        public static string? GetEmail(this ClaimsPrincipal? principal)
+        {
+            if (principal is null)
+            {
+                return null;
+            }
+
+            return principal.FindFirstValue(ClaimTypes.Email)
+                ?? principal.FindFirstValue(JwtRegisteredClaimNames.Email)
+                ?? principal.FindFirstValue("email");
+        }
+
+        public static string? GetName(this ClaimsPrincipal? principal)
+        {
+            if (principal is null)
+            {
+                return null;
+            }
+
+            return principal.FindFirstValue(ClaimTypes.Name)
+                ?? principal.FindFirstValue(JwtRegisteredClaimNames.Name)
+                ?? principal.FindFirstValue("name")
+                ?? principal.FindFirstValue(ClaimTypes.GivenName);
+        }
+
         public static SystemRole? GetSystemRole(this ClaimsPrincipal? principal)
         {
             if (principal is null)

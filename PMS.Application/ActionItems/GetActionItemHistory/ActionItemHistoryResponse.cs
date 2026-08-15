@@ -10,5 +10,6 @@ public sealed record ActionItemHistoryResponse(
     string? NewValue,
     Guid? ChangedByUserId,
     string? ChangedByName,
-    DateTimeOffset ChangedAt
+    DateTimeOffset ChangedAt,
+    string ActivityMessage
 );

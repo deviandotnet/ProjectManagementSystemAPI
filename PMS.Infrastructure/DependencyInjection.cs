@@ -15,6 +15,8 @@ using PMS.Infrastructure.Repository;
 using PMS.Infrastructure.Time;
 using PMS.SharedKernel;
 using System.Text;
+using PMS.Application.Abstractions.Export;
+using PMS.Infrastructure.Services.Export;
 
 namespace PMS.Infrastructure
 {
@@ -50,6 +52,7 @@ namespace PMS.Infrastructure
             services.AddScoped<IUserContext, UserContext>();
             services.AddScoped<IDateTimeProvider, DateTimeProvider>();
             services.AddScoped<ITokenProvider, TokenProvider>();
+            services.AddSingleton<IExcelExportService, ClosedXmlExcelExportService>();
 
             // Configure JWT Bearer Authentication
             string rawSecret = configuration["Jwt:Secret"] ?? string.Empty;

@@ -9,6 +9,10 @@ namespace PMS.Infrastructure.Authentication
     {
         public Guid? UserId => httpContextAccessor.HttpContext?.User.GetUserId();
 
+        public string? Email => httpContextAccessor.HttpContext?.User.GetEmail();
+
+        public string? Name => httpContextAccessor.HttpContext?.User.GetName();
+
         public bool IsAuthenticated => httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false;
 
         public SystemRole? SystemRole => httpContextAccessor.HttpContext?.User.GetSystemRole();

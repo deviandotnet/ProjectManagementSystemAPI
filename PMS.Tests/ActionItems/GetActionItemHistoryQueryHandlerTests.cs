@@ -119,5 +119,6 @@ public class GetActionItemHistoryQueryHandlerTests
         result.Value.Should().HaveCount(1);
         result.Value.First().FieldName.Should().Be("ActionItemName");
         result.Value.First().NewValue.Should().Be("Audited Item");
+        result.Value.First().ActivityMessage.Should().Contain("John Audit changed ActionItemName of 'Audited Item' from 'Old Name' to 'Audited Item'");
     }
 }

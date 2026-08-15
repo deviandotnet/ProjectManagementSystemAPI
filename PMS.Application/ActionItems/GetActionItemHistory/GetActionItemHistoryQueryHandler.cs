@@ -3,6 +3,7 @@ using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
+using PMS.Domain.AuditLogs;
 using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.SharedKernel;
@@ -36,10 +37,11 @@ internal sealed class GetActionItemHistoryQueryHandler(
         }
 
         // ── 3. ActionItem Existence Check ─────────────────────────────────
-        bool actionItemExists = await context.ActionItems
-            .AnyAsync(a => a.Id == query.ActionItemId && a.ProjectId == query.ProjectId, cancellationToken);
+        var actionItem = await context.ActionItems
+            .AsNoTracking()
+            .SingleOrDefaultAsync(a => a.Id == query.ActionItemId && a.ProjectId == query.ProjectId, cancellationToken);
 
-        if (!actionItemExists)
+        if (actionItem is null)
         {
             return Result.Failure<IReadOnlyCollection<ActionItemHistoryResponse>>(ActionItemErrors.NotFound(query.ActionItemId));
         }
@@ -59,23 +61,51 @@ internal sealed class GetActionItemHistoryQueryHandler(
         // ── 5. Query Audit History ─────────────────────────────────────────
         string actionItemIdString = query.ActionItemId.ToString();
 
-        List<ActionItemHistoryResponse> history = await context.AuditLogs
+        List<AuditLog> rawLogs = await context.AuditLogs
             .AsNoTracking()
             .Where(a => a.EntityName == "ActionItem" && a.EntityId == actionItemIdString)
             .OrderByDescending(a => a.ChangedAt)
-            .Select(a => new ActionItemHistoryResponse(
-                a.Id,
-                a.EntityName,
-                a.EntityId,
-                a.Action,
-                a.FieldName,
-                a.OldValue,
-                a.NewValue,
-                a.ChangedByUserId,
-                a.ChangedByName,
-                a.ChangedAt))
             .ToListAsync(cancellationToken);
 
+        string itemTitle = actionItem.ActionItemName;
+
+        List<ActionItemHistoryResponse> history = rawLogs.Select(log =>
+        {
+            string userName = !string.IsNullOrWhiteSpace(log.ChangedByName) ? log.ChangedByName : "System";
+            string formattedDate = log.ChangedAt.ToString("MMM dd, yyyy h:mm tt");
+            string activityMessage = FormatActivityMessage(log, itemTitle, userName, formattedDate);
+
+            return new ActionItemHistoryResponse(
+                log.Id,
+                log.EntityName,
+                log.EntityId,
+                log.Action,
+                log.FieldName,
+                log.OldValue,
+                log.NewValue,
+                log.ChangedByUserId,
+                log.ChangedByName,
+                log.ChangedAt,
+                activityMessage);
+        }).ToList();
+
         return history;
+    }
+
+    private static string FormatActivityMessage(
+        AuditLog log,
+        string displayTitle,
+        string userName,
+        string formattedDate)
+    {
+        return log.Action switch
+        {
+            "Create" => $"{userName} created ActionItem '{displayTitle}' on {formattedDate}",
+            "Delete" => $"{userName} deleted ActionItem '{displayTitle}' on {formattedDate}",
+            "Update" when !string.IsNullOrWhiteSpace(log.FieldName) =>
+                $"{userName} changed {log.FieldName} of '{displayTitle}' from '{(string.IsNullOrWhiteSpace(log.OldValue) ? "none" : log.OldValue)}' to '{(string.IsNullOrWhiteSpace(log.NewValue) ? "none" : log.NewValue)}' on {formattedDate}",
+            "Update" => $"{userName} updated ActionItem '{displayTitle}' on {formattedDate}",
+            _ => $"{userName} modified ActionItem '{displayTitle}' on {formattedDate}"
+        };
     }
 }

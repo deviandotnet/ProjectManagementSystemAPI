@@ -273,6 +273,7 @@ public class ExportProjectExcelQueryHandlerTests
 
         // Verify the export service was called with correct data
         excelService.Received(1).GenerateProjectExport(Arg.Is<ExcelExportData>(data =>
+            data != null &&
             data.ProjectName == "AI Visualization NG Prediction" &&
             data.ActionItems.Count == 2 &&
             data.ActionItems[0].ActionItemName == "Requirements Checking" &&

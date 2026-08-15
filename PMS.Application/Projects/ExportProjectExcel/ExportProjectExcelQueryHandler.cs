@@ -163,11 +163,15 @@ internal sealed class ExportProjectExcelQueryHandler(
         _ => "Unknown"
     };
 
+    private static readonly HashSet<char> InvalidFileNameChars =
+    [
+        '\\', '/', ':', '*', '?', '"', '<', '>', '|',
+        .. Path.GetInvalidFileNameChars()
+    ];
+
     private static string SanitizeFileName(string name)
     {
-        char[] invalidChars = Path.GetInvalidFileNameChars();
-        string sanitized = new(name.Where(c => !invalidChars.Contains(c)).ToArray());
-        // Replace spaces with underscores for cleaner filenames
-        return sanitized.Replace(' ', '_');
+        string stripped = new(name.Where(c => !InvalidFileNameChars.Contains(c) && !char.IsControl(c)).ToArray());
+        return stripped.Replace(' ', '_');
     }
 }

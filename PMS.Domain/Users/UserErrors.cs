@@ -23,4 +23,8 @@ public static class UserErrors
     public static readonly Error NotFoundByEmail = Error.NotFound(
         "Users.NotFoundByEmail",
         "The user with the specified email was not found.");
+
+    public static readonly Error InvalidRefreshToken = Error.Failure(
+        "Users.RefreshToken.Unauthorized",
+        "The refresh token is invalid or expired.");
 }

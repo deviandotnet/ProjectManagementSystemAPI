@@ -7,6 +7,7 @@ using PMS.SharedKernel;
 using System;
 using System.Collections.Generic;
 using PMS.Application.Users;
+using RefreshTokenEntity = PMS.Domain.Users.RefreshToken;
 
 namespace PMS.Application.Users.LoginUser
 {
@@ -37,7 +38,7 @@ namespace PMS.Application.Users.LoginUser
             string accessToken = tokenProvider.CreateAccessToken(user);
             string refreshToken = tokenProvider.CreateRefreshToken();
 
-            var refreshTokenEntity = new RefreshToken
+            var refreshTokenEntity = new RefreshTokenEntity
             {
                 Id = Guid.NewGuid(),
                 Token = refreshToken,

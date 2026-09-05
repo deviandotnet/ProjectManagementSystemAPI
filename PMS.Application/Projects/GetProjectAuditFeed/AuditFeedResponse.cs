@@ -18,5 +18,11 @@ public sealed record AuditFeedItemResponse(
 public sealed record AuditFeedResponse(
     Guid ProjectId,
     string ProjectName,
-    IReadOnlyCollection<AuditFeedItemResponse> Feed
+    IReadOnlyCollection<AuditFeedItemResponse> Feed,
+    int PageNumber,
+    int PageSize,
+    int TotalCount,
+    int TotalPages,
+    bool HasPreviousPage,
+    bool HasNextPage
 );

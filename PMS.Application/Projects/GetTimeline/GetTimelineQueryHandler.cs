@@ -3,11 +3,7 @@ using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
-using PMS.Domain.ActualExecutions;
-using PMS.Domain.Categories;
-using PMS.Domain.PlannedSchedules;
 using PMS.Domain.Projects;
-using PMS.Domain.SubCategories;
 using PMS.Domain.Users;
 using PMS.SharedKernel;
 
@@ -60,168 +56,197 @@ internal sealed class GetTimelineQueryHandler(
             endDate = startDate.AddDays(30);
         }
 
-        List<TimelineColumnResponse> columns = GenerateColumns(scale, startDate, endDate, project.WeekStartDay);
+        List<TimelineColumnResponse> columns = GenerateColumns(
+            scale,
+            startDate,
+            endDate,
+            project.WeekStartDay);
 
-        List<Category> categories = await context.Categories
-            .AsNoTracking()
-            .Where(c => c.ProjectId == query.ProjectId)
-            .OrderBy(c => c.DisplayOrder)
+        var actionItemsQuery =
+            from ai in context.ActionItems.AsNoTracking()
+            join c in context.Categories.AsNoTracking() on ai.CategoryId equals c.Id
+            join sc in context.SubCategories.AsNoTracking() on ai.SubCategoryId equals sc.Id into scGroup
+            from sc in scGroup.DefaultIfEmpty()
+            join ps in context.PlannedSchedules.AsNoTracking() on ai.Id equals ps.ActionItemId into psGroup
+            from ps in psGroup.DefaultIfEmpty()
+            join ae in context.ActualExecutions.AsNoTracking() on ai.Id equals ae.ActionItemId into aeGroup
+            from ae in aeGroup.DefaultIfEmpty()
+            where ai.ProjectId == query.ProjectId
+            select new { ai, c, sc, ps, ae };
+
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int itemsToSkip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
+        int totalCount = await actionItemsQuery.CountAsync(cancellationToken);
+        int totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        List<TimelineItemReadModel> actionItems = await actionItemsQuery
+            .OrderBy(x => x.c.DisplayOrder)
+            .ThenBy(x => x.c.Id)
+            .ThenBy(x => x.ai.SubCategoryId.HasValue)
+            .ThenBy(x => x.sc == null ? 0 : x.sc.DisplayOrder)
+            .ThenBy(x => x.ai.SubCategoryId)
+            .ThenBy(x => x.ai.Sequence)
+            .ThenBy(x => x.ai.Id)
+            .Skip(itemsToSkip)
+            .Take(pageSize)
+            .Select(x => new TimelineItemReadModel(
+                x.ai.Id,
+                x.ai.ActionItemName,
+                x.ai.CategoryId,
+                x.c.Name,
+                x.c.Color,
+                x.ai.SubCategoryId,
+                x.sc == null ? null : x.sc.Name,
+                x.ps == null ? null : x.ps.PlannedStartDate,
+                x.ps == null ? null : x.ps.PlannedEndDate,
+                x.ae == null ? null : x.ae.ActualStartDate,
+                x.ae == null ? null : x.ae.ActualEndDate))
             .ToListAsync(cancellationToken);
-
-        List<SubCategory> subCategories = await context.SubCategories
-            .AsNoTracking()
-            .Where(sc => categories.Select(c => c.Id).Contains(sc.CategoryId))
-            .OrderBy(sc => sc.DisplayOrder)
-            .ToListAsync(cancellationToken);
-
-        var actionItemsRaw = await (from ai in context.ActionItems.AsNoTracking()
-                                    join ps in context.PlannedSchedules.AsNoTracking() on ai.Id equals ps.ActionItemId into psGroup
-                                    from ps in psGroup.DefaultIfEmpty()
-                                    join ae in context.ActualExecutions.AsNoTracking() on ai.Id equals ae.ActionItemId into aeGroup
-                                    from ae in aeGroup.DefaultIfEmpty()
-                                    where ai.ProjectId == query.ProjectId
-                                    select new { ai, ps, ae })
-                                    .OrderBy(x => x.ai.Sequence)
-                                    .ToListAsync(cancellationToken);
 
         DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
-        DayOfWeek weekStartEnum = (DayOfWeek)(project.WeekStartDay % 7);
-
-        List<TimelineRowResponse> rows = [];
-
-        foreach (Category category in categories)
-        {
-            rows.Add(new TimelineRowResponse(
-                RowType: "Category",
-                Id: category.Id,
-                Label: category.Name,
-                Color: category.Color,
-                CategoryId: null,
-                SubCategoryId: null,
-                PlannedStartWeekIndex: null,
-                PlannedEndWeekIndex: null,
-                ActualStartWeekIndex: null,
-                ActualEndWeekIndex: null,
-                Status: null,
-                StatusLabel: null
-            ));
-
-            var directItems = actionItemsRaw.Where(x => x.ai.CategoryId == category.Id && x.ai.SubCategoryId == null);
-            foreach (var item in directItems)
-            {
-                rows.Add(MapActionItemRow(item.ai, item.ps, item.ae, columns, today));
-            }
-
-            var categorySubCats = subCategories.Where(sc => sc.CategoryId == category.Id);
-            foreach (SubCategory subCat in categorySubCats)
-            {
-                rows.Add(new TimelineRowResponse(
-                    RowType: "SubCategory",
-                    Id: subCat.Id,
-                    Label: subCat.Name,
-                    Color: null,
-                    CategoryId: category.Id,
-                    SubCategoryId: null,
-                    PlannedStartWeekIndex: null,
-                    PlannedEndWeekIndex: null,
-                    ActualStartWeekIndex: null,
-                    ActualEndWeekIndex: null,
-                    Status: null,
-                    StatusLabel: null
-                ));
-
-                var subCatItems = actionItemsRaw.Where(x => x.ai.SubCategoryId == subCat.Id);
-                foreach (var item in subCatItems)
-                {
-                    rows.Add(MapActionItemRow(item.ai, item.ps, item.ae, columns, today));
-                }
-            }
-        }
+        List<TimelineRowResponse> rows = BuildRows(actionItems, columns, today);
+        DayOfWeek weekStart = (DayOfWeek)(project.WeekStartDay % 7);
 
         return new TimelineResponse(
-            ProjectId: project.Id,
-            Scale: scale.ToString(),
-            WeekStartDay: weekStartEnum.ToString(),
-            Columns: columns,
-            Rows: rows
-        );
+            project.Id,
+            scale.ToString(),
+            weekStart.ToString(),
+            columns,
+            rows,
+            pageNumber,
+            pageSize,
+            totalCount,
+            totalPages,
+            pageNumber > 1,
+            pageNumber < totalPages);
     }
 
-    private static TimelineRowResponse MapActionItemRow(
-        ActionItem ai,
-        PlannedSchedule? ps,
-        ActualExecution? ae,
+    private static List<TimelineRowResponse> BuildRows(
+        List<TimelineItemReadModel> actionItems,
         List<TimelineColumnResponse> columns,
         DateOnly today)
     {
-        ActionItemStatus status = ComputeStatus(ps, ae, today);
+        List<TimelineRowResponse> rows = [];
+        Guid? currentCategoryId = null;
+        Guid? currentSubCategoryId = null;
 
-        int? plannedStartIndex = GetColumnIndex(ps?.PlannedStartDate, columns);
-        int? plannedEndIndex = GetColumnIndex(ps?.PlannedEndDate, columns);
-        int? actualStartIndex = GetColumnIndex(ae?.ActualStartDate, columns);
-        int? actualEndIndex = GetColumnIndex(ae?.ActualEndDate, columns);
+        foreach (TimelineItemReadModel item in actionItems)
+        {
+            if (currentCategoryId != item.CategoryId)
+            {
+                rows.Add(new TimelineRowResponse(
+                    "Category",
+                    item.CategoryId,
+                    item.CategoryName,
+                    item.CategoryColor,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null));
 
-        return new TimelineRowResponse(
-            RowType: "ActionItem",
-            Id: ai.Id,
-            Label: ai.ActionItemName,
-            Color: null,
-            CategoryId: ai.CategoryId,
-            SubCategoryId: ai.SubCategoryId,
-            PlannedStartWeekIndex: plannedStartIndex,
-            PlannedEndWeekIndex: plannedEndIndex,
-            ActualStartWeekIndex: actualStartIndex,
-            ActualEndWeekIndex: actualEndIndex,
-            Status: (int)status,
-            StatusLabel: status.ToString()
-        );
+                currentCategoryId = item.CategoryId;
+                currentSubCategoryId = null;
+            }
+
+            if (item.SubCategoryId.HasValue && currentSubCategoryId != item.SubCategoryId)
+            {
+                rows.Add(new TimelineRowResponse(
+                    "SubCategory",
+                    item.SubCategoryId.Value,
+                    item.SubCategoryName!,
+                    null,
+                    item.CategoryId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null));
+
+                currentSubCategoryId = item.SubCategoryId;
+            }
+
+            rows.Add(MapActionItemRow(item, columns, today));
+        }
+
+        return rows;
     }
 
-    private static int? GetColumnIndex(DateOnly? date, List<TimelineColumnResponse> columns)
+    private static TimelineRowResponse MapActionItemRow(
+        TimelineItemReadModel item,
+        List<TimelineColumnResponse> columns,
+        DateOnly today)
+    {
+        ActionItemStatus status = ActionItemStatusService.ComputeStatus(
+            item.PlannedEndDate,
+            item.ActualStartDate,
+            item.ActualEndDate,
+            today);
+
+        return new TimelineRowResponse(
+            "ActionItem",
+            item.Id,
+            item.ActionItemName,
+            null,
+            item.CategoryId,
+            item.SubCategoryId,
+            GetColumnIndex(item.PlannedStartDate, columns),
+            GetColumnIndex(item.PlannedEndDate, columns),
+            GetColumnIndex(item.ActualStartDate, columns),
+            GetColumnIndex(item.ActualEndDate, columns),
+            (int)status,
+            status.ToString());
+    }
+
+    private static int? GetColumnIndex(
+        DateOnly? date,
+        List<TimelineColumnResponse> columns)
     {
         if (!date.HasValue || columns.Count == 0)
         {
             return null;
         }
 
-        DateOnly d = date.Value;
-        if (d < columns[0].StartDate) return 0;
-        if (d > columns[^1].EndDate) return columns.Count - 1;
-
-        for (int i = 0; i < columns.Count; i++)
+        DateOnly value = date.Value;
+        if (value < columns[0].StartDate)
         {
-            if (d >= columns[i].StartDate && d <= columns[i].EndDate)
+            return 0;
+        }
+
+        if (value > columns[^1].EndDate)
+        {
+            return columns.Count - 1;
+        }
+
+        int low = 0;
+        int high = columns.Count - 1;
+
+        while (low <= high)
+        {
+            int middle = low + ((high - low) / 2);
+            TimelineColumnResponse column = columns[middle];
+
+            if (value < column.StartDate)
             {
-                return i;
+                high = middle - 1;
+            }
+            else if (value > column.EndDate)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                return middle;
             }
         }
 
         return null;
-    }
-
-    private static ActionItemStatus ComputeStatus(
-        PlannedSchedule? planned,
-        ActualExecution? actual,
-        DateOnly today)
-    {
-        if (planned is null) return ActionItemStatus.Plan;
-
-        if (actual?.ActualEndDate is not null)
-        {
-            if (actual.ActualEndDate < planned.PlannedEndDate)
-                return ActionItemStatus.CompletedEarly;
-            if (actual.ActualEndDate == planned.PlannedEndDate)
-                return ActionItemStatus.CompletedOntime;
-            return ActionItemStatus.CompletedLate;
-        }
-
-        if (actual?.ActualStartDate is not null)
-            return ActionItemStatus.Ongoing;
-
-        if (today > planned.PlannedEndDate)
-            return ActionItemStatus.Delayed;
-
-        return ActionItemStatus.Plan;
     }
 
     private static List<TimelineColumnResponse> GenerateColumns(
@@ -235,30 +260,30 @@ internal sealed class GetTimelineQueryHandler(
         switch (scale)
         {
             case TimelineScale.Daily:
-                for (DateOnly curr = startDate; curr <= endDate; curr = curr.AddDays(1))
+                for (DateOnly current = startDate; current <= endDate; current = current.AddDays(1))
                 {
                     columns.Add(new TimelineColumnResponse(
-                        Label: curr.ToString("yyyy-MM-dd"),
-                        StartDate: curr,
-                        EndDate: curr));
+                        current.ToString("yyyy-MM-dd"),
+                        current,
+                        current));
                 }
                 break;
 
             case TimelineScale.Weekly:
                 {
                     DayOfWeek targetStartDay = (DayOfWeek)(weekStartDay % 7);
-                    DateOnly currStart = AlignToWeekStart(startDate, targetStartDay);
-                    int weekNum = 1;
+                    DateOnly currentStart = AlignToWeekStart(startDate, targetStartDay);
+                    int weekNumber = 1;
 
-                    while (currStart <= endDate)
+                    while (currentStart <= endDate)
                     {
-                        DateOnly currEnd = currStart.AddDays(6);
+                        DateOnly currentEnd = currentStart.AddDays(6);
                         columns.Add(new TimelineColumnResponse(
-                            Label: $"WW{weekNum:D2}",
-                            StartDate: currStart,
-                            EndDate: currEnd));
-                        currStart = currStart.AddDays(7);
-                        weekNum++;
+                            $"WW{weekNumber:D2}",
+                            currentStart,
+                            currentEnd));
+                        currentStart = currentStart.AddDays(7);
+                        weekNumber++;
                     }
                 }
                 break;
@@ -266,33 +291,33 @@ internal sealed class GetTimelineQueryHandler(
             case TimelineScale.Biweekly:
                 {
                     DayOfWeek targetStartDay = (DayOfWeek)(weekStartDay % 7);
-                    DateOnly currStart = AlignToWeekStart(startDate, targetStartDay);
-                    int bwNum = 1;
+                    DateOnly currentStart = AlignToWeekStart(startDate, targetStartDay);
+                    int biweeklyNumber = 1;
 
-                    while (currStart <= endDate)
+                    while (currentStart <= endDate)
                     {
-                        DateOnly currEnd = currStart.AddDays(13);
+                        DateOnly currentEnd = currentStart.AddDays(13);
                         columns.Add(new TimelineColumnResponse(
-                            Label: $"BW{bwNum:D2}",
-                            StartDate: currStart,
-                            EndDate: currEnd));
-                        currStart = currStart.AddDays(14);
-                        bwNum++;
+                            $"BW{biweeklyNumber:D2}",
+                            currentStart,
+                            currentEnd));
+                        currentStart = currentStart.AddDays(14);
+                        biweeklyNumber++;
                     }
                 }
                 break;
 
             case TimelineScale.Monthly:
                 {
-                    DateOnly currStart = new DateOnly(startDate.Year, startDate.Month, 1);
-                    while (currStart <= endDate)
+                    DateOnly currentStart = new(startDate.Year, startDate.Month, 1);
+                    while (currentStart <= endDate)
                     {
-                        DateOnly currEnd = currStart.AddMonths(1).AddDays(-1);
+                        DateOnly currentEnd = currentStart.AddMonths(1).AddDays(-1);
                         columns.Add(new TimelineColumnResponse(
-                            Label: currStart.ToString("MMM yyyy"),
-                            StartDate: currStart,
-                            EndDate: currEnd));
-                        currStart = currStart.AddMonths(1);
+                            currentStart.ToString("MMM yyyy"),
+                            currentStart,
+                            currentEnd));
+                        currentStart = currentStart.AddMonths(1);
                     }
                 }
                 break;
@@ -300,16 +325,16 @@ internal sealed class GetTimelineQueryHandler(
             case TimelineScale.Quarterly:
                 {
                     int firstMonthOfQuarter = ((startDate.Month - 1) / 3) * 3 + 1;
-                    DateOnly currStart = new DateOnly(startDate.Year, firstMonthOfQuarter, 1);
-                    while (currStart <= endDate)
+                    DateOnly currentStart = new(startDate.Year, firstMonthOfQuarter, 1);
+                    while (currentStart <= endDate)
                     {
-                        DateOnly currEnd = currStart.AddMonths(3).AddDays(-1);
-                        int quarterNum = ((currStart.Month - 1) / 3) + 1;
+                        DateOnly currentEnd = currentStart.AddMonths(3).AddDays(-1);
+                        int quarterNumber = ((currentStart.Month - 1) / 3) + 1;
                         columns.Add(new TimelineColumnResponse(
-                            Label: $"Q{quarterNum} {currStart.Year}",
-                            StartDate: currStart,
-                            EndDate: currEnd));
-                        currStart = currStart.AddMonths(3);
+                            $"Q{quarterNumber} {currentStart.Year}",
+                            currentStart,
+                            currentEnd));
+                        currentStart = currentStart.AddMonths(3);
                     }
                 }
                 break;
@@ -320,7 +345,20 @@ internal sealed class GetTimelineQueryHandler(
 
     private static DateOnly AlignToWeekStart(DateOnly date, DayOfWeek weekStartDay)
     {
-        int diff = (7 + (date.DayOfWeek - weekStartDay)) % 7;
-        return date.AddDays(-diff);
+        int difference = (7 + (date.DayOfWeek - weekStartDay)) % 7;
+        return date.AddDays(-difference);
     }
+
+    private sealed record TimelineItemReadModel(
+        Guid Id,
+        string ActionItemName,
+        Guid CategoryId,
+        string CategoryName,
+        string? CategoryColor,
+        Guid? SubCategoryId,
+        string? SubCategoryName,
+        DateOnly? PlannedStartDate,
+        DateOnly? PlannedEndDate,
+        DateOnly? ActualStartDate,
+        DateOnly? ActualEndDate);
 }

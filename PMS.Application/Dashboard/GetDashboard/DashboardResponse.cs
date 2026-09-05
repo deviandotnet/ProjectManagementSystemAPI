@@ -16,5 +16,11 @@ public sealed record DashboardProjectSummaryResponse(
 );
 
 public sealed record DashboardResponse(
-    List<DashboardProjectSummaryResponse> Projects
+    List<DashboardProjectSummaryResponse> Projects,
+    int PageNumber,
+    int PageSize,
+    int TotalCount,
+    int TotalPages,
+    bool HasPreviousPage,
+    bool HasNextPage
 );

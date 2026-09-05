@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
@@ -12,15 +13,15 @@ namespace PMS.Application.Categories.GetCategoriesByProjectId;
 internal sealed class GetCategoriesByProjectIdQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext)
-    : IQueryHandler<GetCategoriesByProjectIdQuery, IReadOnlyCollection<CategoryResponse>>
+    : IQueryHandler<GetCategoriesByProjectIdQuery, PagedResponse<CategoryResponse>>
 {
-    public async Task<Result<IReadOnlyCollection<CategoryResponse>>> Handle(
+    public async Task<Result<PagedResponse<CategoryResponse>>> Handle(
         GetCategoriesByProjectIdQuery query,
         CancellationToken cancellationToken)
     {
         if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
-            return Result.Failure<IReadOnlyCollection<CategoryResponse>>(UserErrors.Unauthorized);
+            return Result.Failure<PagedResponse<CategoryResponse>>(UserErrors.Unauthorized);
         }
 
         Guid userId = userContext.UserId.Value;
@@ -30,7 +31,7 @@ internal sealed class GetCategoriesByProjectIdQueryHandler(
 
         if (!projectExists)
         {
-            return Result.Failure<IReadOnlyCollection<CategoryResponse>>(ProjectErrors.NotFound(query.ProjectId));
+            return Result.Failure<PagedResponse<CategoryResponse>>(ProjectErrors.NotFound(query.ProjectId));
         }
 
         if (!userContext.IsSystemAdmin)
@@ -40,14 +41,25 @@ internal sealed class GetCategoriesByProjectIdQueryHandler(
 
             if (!isMember)
             {
-                return Result.Failure<IReadOnlyCollection<CategoryResponse>>(CategoryErrors.NotProjectMember);
+                return Result.Failure<PagedResponse<CategoryResponse>>(CategoryErrors.NotProjectMember);
             }
         }
 
-        List<CategoryResponse> categories = await context.Categories
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
+
+        var categoriesQuery = context.Categories
             .AsNoTracking()
-            .Where(c => c.ProjectId == query.ProjectId)
+            .Where(c => c.ProjectId == query.ProjectId);
+
+        int totalCount = await categoriesQuery.CountAsync(cancellationToken);
+
+        List<CategoryResponse> categories = await categoriesQuery
             .OrderBy(c => c.DisplayOrder)
+            .ThenBy(c => c.Id)
+            .Skip(skip)
+            .Take(pageSize)
             .Select(c => new CategoryResponse(
                 c.Id,
                 c.ProjectId,
@@ -57,6 +69,10 @@ internal sealed class GetCategoriesByProjectIdQueryHandler(
                 c.CreatedByUserId))
             .ToListAsync(cancellationToken);
 
-        return categories;
+        return PagedResponse<CategoryResponse>.Create(
+            categories,
+            pageNumber,
+            pageSize,
+            totalCount);
     }
 }

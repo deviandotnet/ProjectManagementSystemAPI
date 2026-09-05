@@ -20,7 +20,6 @@ internal sealed class GetDashboardQueryHandler(
         GetDashboardQuery query,
         CancellationToken cancellationToken)
     {
-        // 1. Auth check
         if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
             return Result.Failure<DashboardResponse>(UserErrors.Unauthorized);
@@ -28,57 +27,45 @@ internal sealed class GetDashboardQueryHandler(
 
         Guid userId = userContext.UserId.Value;
         bool isSystemAdmin = userContext.IsSystemAdmin;
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
 
-        // 2. Query user's projects and member roles
-        List<Project> projects;
-        Dictionary<Guid, UserRole> userRolesByProject = new();
+        var projectsQuery = context.Projects
+            .AsNoTracking()
+            .Where(p => isSystemAdmin ||
+                        p.CreatedByUserId == userId ||
+                        context.ProjectMembers.Any(pm =>
+                            pm.ProjectId == p.Id && pm.UserId == userId));
 
-        if (isSystemAdmin)
-        {
-            projects = await context.Projects
-                .AsNoTracking()
-                .OrderBy(p => p.Name)
-                .ToListAsync(cancellationToken);
+        int totalCount = await projectsQuery.CountAsync(cancellationToken);
 
-            var members = await context.ProjectMembers
-                .AsNoTracking()
-                .Where(pm => pm.UserId == userId)
-                .ToListAsync(cancellationToken);
-
-            foreach (var m in members)
-            {
-                userRolesByProject[m.ProjectId] = m.Role;
-            }
-        }
-        else
-        {
-            var userMemberships = await context.ProjectMembers
-                .AsNoTracking()
-                .Where(pm => pm.UserId == userId)
-                .ToListAsync(cancellationToken);
-
-            foreach (var m in userMemberships)
-            {
-                userRolesByProject[m.ProjectId] = m.Role;
-            }
-
-            var memberProjectIds = userMemberships.Select(m => m.ProjectId).ToList();
-
-            projects = await context.Projects
-                .AsNoTracking()
-                .Where(p => memberProjectIds.Contains(p.Id) || p.CreatedByUserId == userId)
-                .OrderBy(p => p.Name)
-                .ToListAsync(cancellationToken);
-        }
+        List<ProjectDashboardReadModel> projects = await projectsQuery
+            .OrderBy(p => p.Name)
+            .ThenBy(p => p.Id)
+            .Skip(skip)
+            .Take(pageSize)
+            .Select(p => new ProjectDashboardReadModel(
+                p.Id,
+                p.Name,
+                p.Status,
+                p.ProgressMode,
+                p.StartDate,
+                p.EndDate,
+                p.CreatedByUserId))
+            .ToListAsync(cancellationToken);
 
         if (projects.Count == 0)
         {
-            return new DashboardResponse([]);
+            return CreateResponse([], pageNumber, pageSize, totalCount);
         }
 
-        var projectIds = projects.Select(p => p.Id).ToList();
+        List<Guid> projectIds = projects.Select(p => p.Id).ToList();
+        Dictionary<Guid, UserRole> userRolesByProject = await context.ProjectMembers
+            .AsNoTracking()
+            .Where(pm => pm.UserId == userId && projectIds.Contains(pm.ProjectId))
+            .ToDictionaryAsync(pm => pm.ProjectId, pm => pm.Role, cancellationToken);
 
-        // 3. Load Action Items for all user projects in a single query
         var actionItemsData = await (
             from ai in context.ActionItems.AsNoTracking()
             where projectIds.Contains(ai.ProjectId)
@@ -89,33 +76,28 @@ internal sealed class GetDashboardQueryHandler(
             select new
             {
                 ai.ProjectId,
-                ai.Id,
                 ai.Weight,
                 PlannedEndDate = ps != null ? (DateOnly?)ps.PlannedEndDate : null,
                 ActualStartDate = ae != null ? (DateOnly?)ae.ActualStartDate : null,
                 ActualEndDate = ae != null ? (DateOnly?)ae.ActualEndDate : null
-            }
-        ).ToListAsync(cancellationToken);
+            }).ToListAsync(cancellationToken);
 
         var actionItemsByProject = actionItemsData
             .GroupBy(ai => ai.ProjectId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        // 4. Compute KPIs per project
         DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
-        var projectSummaries = new List<DashboardProjectSummaryResponse>();
+        var projectSummaries = new List<DashboardProjectSummaryResponse>(projects.Count);
 
-        foreach (var project in projects)
+        foreach (ProjectDashboardReadModel project in projects)
         {
             actionItemsByProject.TryGetValue(project.Id, out var projectItems);
             projectItems ??= [];
 
-            int totalItems = projectItems.Count;
             int completedCount = 0;
             int ongoingCount = 0;
             int delayedCount = 0;
             int plannedCount = 0;
-
             double totalWeight = 0;
             double completedWeight = 0;
 
@@ -151,39 +133,22 @@ internal sealed class GetDashboardQueryHandler(
                 }
             }
 
-            // Calculate progress percent based on ProgressMode
-            double progressPercent;
-            if (project.ProgressMode == ProgressMode.WeightBased)
-            {
-                progressPercent = totalWeight > 0
-                    ? Math.Round((completedWeight / totalWeight) * 100.0, 2)
+            int totalItems = projectItems.Count;
+            double progressPercent = project.ProgressMode == ProgressMode.WeightBased
+                ? totalWeight > 0
+                    ? Math.Round(completedWeight / totalWeight * 100.0, 2)
+                    : 0.0
+                : totalItems > 0
+                    ? Math.Round((double)completedCount / totalItems * 100.0, 2)
                     : 0.0;
-            }
-            else
-            {
-                progressPercent = totalItems > 0
-                    ? Math.Round(((double)completedCount / totalItems) * 100.0, 2)
-                    : 0.0;
-            }
 
-            // Determine user role string
-            string roleLabel;
-            if (userRolesByProject.TryGetValue(project.Id, out var userRole))
-            {
-                roleLabel = userRole.ToString();
-            }
-            else if (isSystemAdmin)
-            {
-                roleLabel = "Admin";
-            }
-            else if (project.CreatedByUserId == userId)
-            {
-                roleLabel = "ProjectManager";
-            }
-            else
-            {
-                roleLabel = "Viewer";
-            }
+            string roleLabel = userRolesByProject.TryGetValue(project.Id, out UserRole userRole)
+                ? userRole.ToString()
+                : isSystemAdmin
+                    ? "Admin"
+                    : project.CreatedByUserId == userId
+                        ? "ProjectManager"
+                        : "Viewer";
 
             projectSummaries.Add(new DashboardProjectSummaryResponse(
                 project.Id,
@@ -197,10 +162,36 @@ internal sealed class GetDashboardQueryHandler(
                 plannedCount,
                 project.StartDate,
                 project.EndDate,
-                roleLabel
-            ));
+                roleLabel));
         }
 
-        return new DashboardResponse(projectSummaries);
+        return CreateResponse(projectSummaries, pageNumber, pageSize, totalCount);
     }
+
+    private static DashboardResponse CreateResponse(
+        List<DashboardProjectSummaryResponse> projects,
+        int pageNumber,
+        int pageSize,
+        int totalCount)
+    {
+        int totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        return new DashboardResponse(
+            projects,
+            pageNumber,
+            pageSize,
+            totalCount,
+            totalPages,
+            pageNumber > 1,
+            pageNumber < totalPages);
+    }
+
+    private sealed record ProjectDashboardReadModel(
+        Guid Id,
+        string Name,
+        ProjectStatus Status,
+        ProgressMode ProgressMode,
+        DateOnly StartDate,
+        DateOnly EndDate,
+        Guid? CreatedByUserId);
 }

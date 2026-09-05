@@ -16,11 +16,16 @@ internal sealed class GetProjectMembers : IApiEndpoint
     {
         app.MapGet("api/projects/{id:guid}/members", async (
             Guid id,
-            IQueryHandler<GetProjectMembersQuery, List<ProjectMemberResponse>> handler,
+            int? pageNumber,
+            int? pageSize,
+            IQueryHandler<GetProjectMembersQuery, PagedResponse<ProjectMemberResponse>> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetProjectMembersQuery(id);
-            Result<List<ProjectMemberResponse>> result = await handler.Handle(query, cancellationToken);
+            var query = new GetProjectMembersQuery(
+                id,
+                pageNumber ?? 1,
+                pageSize ?? 20);
+            Result<PagedResponse<ProjectMemberResponse>> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
                 members => Results.Ok(members),
@@ -28,7 +33,7 @@ internal sealed class GetProjectMembers : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("Get Project Members")
-        .WithDescription("Retrieves all members assigned to the specified project along with their names, emails, project-level roles, and join dates. Requires Project Member authorization.")
+        .WithDescription("Retrieves a paginated list of members assigned to the specified project along with their names, emails, project-level roles, and join dates. Requires Project Member authorization.")
         .WithTags(Tags.Projects);
     }
 }

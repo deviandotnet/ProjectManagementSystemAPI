@@ -16,11 +16,16 @@ internal sealed class GetSubCategoriesByCategoryId : IApiEndpoint
     {
         app.MapGet("api/categories/{categoryId:guid}/subcategories", async (
             Guid categoryId,
-            IQueryHandler<GetSubCategoriesByCategoryIdQuery, IReadOnlyCollection<SubCategoryResponse>> handler,
+            int? pageNumber,
+            int? pageSize,
+            IQueryHandler<GetSubCategoriesByCategoryIdQuery, PagedResponse<SubCategoryResponse>> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetSubCategoriesByCategoryIdQuery(categoryId);
-            Result<IReadOnlyCollection<SubCategoryResponse>> result = await handler.Handle(query, cancellationToken);
+            var query = new GetSubCategoriesByCategoryIdQuery(
+                categoryId,
+                pageNumber ?? 1,
+                pageSize ?? 20);
+            Result<PagedResponse<SubCategoryResponse>> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
                 subCategories => Results.Ok(subCategories),
@@ -28,7 +33,7 @@ internal sealed class GetSubCategoriesByCategoryId : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("List SubCategories")
-        .WithDescription("Retrieves all subcategories for a given category ID ordered by display order.")
+        .WithDescription("Retrieves a paginated list of subcategories for a given category ID ordered by display order.")
         .WithTags(Tags.Categories);
     }
 }

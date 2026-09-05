@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PMS.API;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Projects.GetProjectsByUserId;
 using PMS.Domain.Projects;
@@ -129,8 +130,57 @@ public class GetProjectsByUserIdIntegrationTests : IClassFixture<WebApplicationF
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        List<ProjectResponse>? projects = await response.Content.ReadFromJsonAsync<List<ProjectResponse>>();
+        PagedResponse<ProjectResponse>? projects =
+            await response.Content.ReadFromJsonAsync<PagedResponse<ProjectResponse>>();
         projects.Should().NotBeNull();
-        projects!.Should().ContainSingle(p => p.Name == "Integration Project 1");
+        projects!.Items.Should().ContainSingle(p => p.Name == "Integration Project 1");
+        projects.PageNumber.Should().Be(1);
+        projects.PageSize.Should().Be(20);
+        projects.TotalCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserProjects_Should_ReturnRequestedPageWithMetadata()
+    {
+        // Arrange
+        var (user, client) = await CreateAuthenticatedClientAsync();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            DateTimeOffset createdAt = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+            for (int index = 1; index <= 3; index++)
+            {
+                context.Projects.Add(new Project
+                {
+                    Id = Guid.Parse($"00000000-0000-0000-0000-{index:D12}"),
+                    Name = $"Paged Project {index}",
+                    StartDate = new DateOnly(2026, 1, 1),
+                    EndDate = new DateOnly(2026, 12, 31),
+                    CreatedByUserId = user.Id,
+                    CreatedAt = createdAt.AddDays(index)
+                });
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        HttpResponseMessage response = await client.GetAsync("api/projects?pageNumber=2&pageSize=1");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        PagedResponse<ProjectResponse>? page =
+            await response.Content.ReadFromJsonAsync<PagedResponse<ProjectResponse>>();
+        page.Should().NotBeNull();
+        page!.Items.Should().ContainSingle();
+        page.Items.Single().Id.Should().Be(Guid.Parse("00000000-0000-0000-0000-000000000002"));
+        page.PageNumber.Should().Be(2);
+        page.PageSize.Should().Be(1);
+        page.TotalCount.Should().Be(3);
+        page.TotalPages.Should().Be(3);
+        page.HasPreviousPage.Should().BeTrue();
+        page.HasNextPage.Should().BeTrue();
     }
 }

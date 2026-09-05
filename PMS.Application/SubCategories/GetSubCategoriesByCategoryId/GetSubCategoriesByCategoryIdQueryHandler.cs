@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
@@ -12,15 +13,15 @@ namespace PMS.Application.SubCategories.GetSubCategoriesByCategoryId;
 internal sealed class GetSubCategoriesByCategoryIdQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext)
-    : IQueryHandler<GetSubCategoriesByCategoryIdQuery, IReadOnlyCollection<SubCategoryResponse>>
+    : IQueryHandler<GetSubCategoriesByCategoryIdQuery, PagedResponse<SubCategoryResponse>>
 {
-    public async Task<Result<IReadOnlyCollection<SubCategoryResponse>>> Handle(
+    public async Task<Result<PagedResponse<SubCategoryResponse>>> Handle(
         GetSubCategoriesByCategoryIdQuery query,
         CancellationToken cancellationToken)
     {
         if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
-            return Result.Failure<IReadOnlyCollection<SubCategoryResponse>>(UserErrors.Unauthorized);
+            return Result.Failure<PagedResponse<SubCategoryResponse>>(UserErrors.Unauthorized);
         }
 
         Guid userId = userContext.UserId.Value;
@@ -31,7 +32,7 @@ internal sealed class GetSubCategoriesByCategoryIdQueryHandler(
 
         if (category is null)
         {
-            return Result.Failure<IReadOnlyCollection<SubCategoryResponse>>(CategoryErrors.NotFound(query.CategoryId));
+            return Result.Failure<PagedResponse<SubCategoryResponse>>(CategoryErrors.NotFound(query.CategoryId));
         }
 
         if (!userContext.IsSystemAdmin)
@@ -41,14 +42,25 @@ internal sealed class GetSubCategoriesByCategoryIdQueryHandler(
 
             if (!isMember)
             {
-                return Result.Failure<IReadOnlyCollection<SubCategoryResponse>>(SubCategoryErrors.NotProjectMember);
+                return Result.Failure<PagedResponse<SubCategoryResponse>>(SubCategoryErrors.NotProjectMember);
             }
         }
 
-        List<SubCategoryResponse> subCategories = await context.SubCategories
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
+
+        var subCategoriesQuery = context.SubCategories
             .AsNoTracking()
-            .Where(sc => sc.CategoryId == query.CategoryId)
+            .Where(sc => sc.CategoryId == query.CategoryId);
+
+        int totalCount = await subCategoriesQuery.CountAsync(cancellationToken);
+
+        List<SubCategoryResponse> subCategories = await subCategoriesQuery
             .OrderBy(sc => sc.DisplayOrder)
+            .ThenBy(sc => sc.Id)
+            .Skip(skip)
+            .Take(pageSize)
             .Select(sc => new SubCategoryResponse(
                 sc.Id,
                 sc.CategoryId,
@@ -56,6 +68,10 @@ internal sealed class GetSubCategoriesByCategoryIdQueryHandler(
                 sc.DisplayOrder))
             .ToListAsync(cancellationToken);
 
-        return subCategories;
+        return PagedResponse<SubCategoryResponse>.Create(
+            subCategories,
+            pageNumber,
+            pageSize,
+            totalCount);
     }
 }

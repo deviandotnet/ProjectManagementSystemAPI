@@ -26,5 +26,11 @@ public sealed record TimelineResponse(
     string Scale,
     string WeekStartDay,
     List<TimelineColumnResponse> Columns,
-    List<TimelineRowResponse> Rows
+    List<TimelineRowResponse> Rows,
+    int PageNumber,
+    int PageSize,
+    int TotalCount,
+    int TotalPages,
+    bool HasPreviousPage,
+    bool HasNextPage
 );

@@ -18,7 +18,9 @@ internal sealed class GetProjectsByUserId : IApiEndpoint
     {
         app.MapGet("api/projects", async (
             IUserContext userContext,
-            IQueryHandler<GetProjectsByUserIdQuery, List<ProjectResponse>> handler,
+            int? pageNumber,
+            int? pageSize,
+            IQueryHandler<GetProjectsByUserIdQuery, PagedResponse<ProjectResponse>> handler,
             CancellationToken cancellationToken) =>
         {
             if (!userContext.UserId.HasValue)
@@ -26,9 +28,12 @@ internal sealed class GetProjectsByUserId : IApiEndpoint
                 return CustomResults.Problem(UserErrors.Unauthorized);
             }
 
-            var query = new GetProjectsByUserIdQuery(userContext.UserId.Value);
+            var query = new GetProjectsByUserIdQuery(
+                userContext.UserId.Value,
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
-            Result<List<ProjectResponse>> result = await handler.Handle(query, cancellationToken);
+            Result<PagedResponse<ProjectResponse>> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
                 projects => Results.Ok(projects),
@@ -36,17 +41,22 @@ internal sealed class GetProjectsByUserId : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("List Projects for Current User")
-        .WithDescription("Retrieves all projects for the currently authenticated user.")
+        .WithDescription("Retrieves a paginated list of projects for the currently authenticated user.")
         .WithTags(Tags.Projects);
 
         app.MapGet("api/users/{userId:guid}/projects", async (
             Guid userId,
-            IQueryHandler<GetProjectsByUserIdQuery, List<ProjectResponse>> handler,
+            int? pageNumber,
+            int? pageSize,
+            IQueryHandler<GetProjectsByUserIdQuery, PagedResponse<ProjectResponse>> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetProjectsByUserIdQuery(userId);
+            var query = new GetProjectsByUserIdQuery(
+                userId,
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
-            Result<List<ProjectResponse>> result = await handler.Handle(query, cancellationToken);
+            Result<PagedResponse<ProjectResponse>> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
                 projects => Results.Ok(projects),
@@ -54,7 +64,7 @@ internal sealed class GetProjectsByUserId : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("Get Projects by User ID")
-        .WithDescription("Retrieves all projects created by or associated with a specific user ID.")
+        .WithDescription("Retrieves a paginated list of projects created by or associated with a specific user ID.")
         .WithTags(Tags.Projects);
     }
 }

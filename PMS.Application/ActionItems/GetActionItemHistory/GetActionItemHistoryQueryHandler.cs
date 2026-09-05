@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
@@ -13,16 +14,16 @@ namespace PMS.Application.ActionItems.GetActionItemHistory;
 internal sealed class GetActionItemHistoryQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext)
-    : IQueryHandler<GetActionItemHistoryQuery, IReadOnlyCollection<ActionItemHistoryResponse>>
+    : IQueryHandler<GetActionItemHistoryQuery, PagedResponse<ActionItemHistoryResponse>>
 {
-    public async Task<Result<IReadOnlyCollection<ActionItemHistoryResponse>>> Handle(
+    public async Task<Result<PagedResponse<ActionItemHistoryResponse>>> Handle(
         GetActionItemHistoryQuery query,
         CancellationToken cancellationToken)
     {
         // ── 1. Auth Check ──────────────────────────────────────────────────
         if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
-            return Result.Failure<IReadOnlyCollection<ActionItemHistoryResponse>>(UserErrors.Unauthorized);
+            return Result.Failure<PagedResponse<ActionItemHistoryResponse>>(UserErrors.Unauthorized);
         }
 
         Guid userId = userContext.UserId.Value;
@@ -33,17 +34,19 @@ internal sealed class GetActionItemHistoryQueryHandler(
 
         if (!projectExists)
         {
-            return Result.Failure<IReadOnlyCollection<ActionItemHistoryResponse>>(ProjectErrors.NotFound(query.ProjectId));
+            return Result.Failure<PagedResponse<ActionItemHistoryResponse>>(ProjectErrors.NotFound(query.ProjectId));
         }
 
         // ── 3. ActionItem Existence Check ─────────────────────────────────
-        var actionItem = await context.ActionItems
+        string? itemTitle = await context.ActionItems
             .AsNoTracking()
-            .SingleOrDefaultAsync(a => a.Id == query.ActionItemId && a.ProjectId == query.ProjectId, cancellationToken);
+            .Where(a => a.Id == query.ActionItemId && a.ProjectId == query.ProjectId)
+            .Select(a => a.ActionItemName)
+            .SingleOrDefaultAsync(cancellationToken);
 
-        if (actionItem is null)
+        if (itemTitle is null)
         {
-            return Result.Failure<IReadOnlyCollection<ActionItemHistoryResponse>>(ActionItemErrors.NotFound(query.ActionItemId));
+            return Result.Failure<PagedResponse<ActionItemHistoryResponse>>(ActionItemErrors.NotFound(query.ActionItemId));
         }
 
         // ── 4. Project Membership Check ────────────────────────────────────
@@ -54,20 +57,29 @@ internal sealed class GetActionItemHistoryQueryHandler(
 
             if (!isMember)
             {
-                return Result.Failure<IReadOnlyCollection<ActionItemHistoryResponse>>(ActionItemErrors.NotProjectMember);
+                return Result.Failure<PagedResponse<ActionItemHistoryResponse>>(ActionItemErrors.NotProjectMember);
             }
         }
 
         // ── 5. Query Audit History ─────────────────────────────────────────
         string actionItemIdString = query.ActionItemId.ToString();
 
-        List<AuditLog> rawLogs = await context.AuditLogs
-            .AsNoTracking()
-            .Where(a => a.EntityName == "ActionItem" && a.EntityId == actionItemIdString)
-            .OrderByDescending(a => a.ChangedAt)
-            .ToListAsync(cancellationToken);
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
 
-        string itemTitle = actionItem.ActionItemName;
+        var auditLogsQuery = context.AuditLogs
+            .AsNoTracking()
+            .Where(a => a.EntityName == "ActionItem" && a.EntityId == actionItemIdString);
+
+        int totalCount = await auditLogsQuery.CountAsync(cancellationToken);
+
+        List<AuditLog> rawLogs = await auditLogsQuery
+            .OrderByDescending(a => a.ChangedAt)
+            .ThenByDescending(a => a.Id)
+            .Skip(skip)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
 
         List<ActionItemHistoryResponse> history = rawLogs.Select(log =>
         {
@@ -89,7 +101,11 @@ internal sealed class GetActionItemHistoryQueryHandler(
                 activityMessage);
         }).ToList();
 
-        return history;
+        return PagedResponse<ActionItemHistoryResponse>.Create(
+            history,
+            pageNumber,
+            pageSize,
+            totalCount);
     }
 
     private static string FormatActivityMessage(

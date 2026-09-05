@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
@@ -12,15 +13,15 @@ namespace PMS.Application.ProjectMembers.GetProjectMembers;
 internal sealed class GetProjectMembersQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext)
-    : IQueryHandler<GetProjectMembersQuery, List<ProjectMemberResponse>>
+    : IQueryHandler<GetProjectMembersQuery, PagedResponse<ProjectMemberResponse>>
 {
-    public async Task<Result<List<ProjectMemberResponse>>> Handle(
+    public async Task<Result<PagedResponse<ProjectMemberResponse>>> Handle(
         GetProjectMembersQuery query,
         CancellationToken cancellationToken)
     {
         if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
-            return Result.Failure<List<ProjectMemberResponse>>(UserErrors.Unauthorized);
+            return Result.Failure<PagedResponse<ProjectMemberResponse>>(UserErrors.Unauthorized);
         }
 
         bool projectExists = await context.Projects
@@ -28,7 +29,7 @@ internal sealed class GetProjectMembersQueryHandler(
 
         if (!projectExists)
         {
-            return Result.Failure<List<ProjectMemberResponse>>(ProjectErrors.NotFound(query.ProjectId));
+            return Result.Failure<PagedResponse<ProjectMemberResponse>>(ProjectErrors.NotFound(query.ProjectId));
         }
 
         if (!userContext.IsSystemAdmin)
@@ -38,25 +39,42 @@ internal sealed class GetProjectMembersQueryHandler(
 
             if (!isMember)
             {
-                return Result.Failure<List<ProjectMemberResponse>>(ProjectMemberErrors.NotProjectMember);
+                return Result.Failure<PagedResponse<ProjectMemberResponse>>(ProjectMemberErrors.NotProjectMember);
             }
         }
 
-        List<ProjectMemberResponse> members = await (
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
+
+        var membersQuery =
             from pm in context.ProjectMembers.AsNoTracking()
             join u in context.Users.AsNoTracking() on pm.UserId equals u.Id
             where pm.ProjectId == query.ProjectId
-            select new ProjectMemberResponse(
-                pm.Id,
-                pm.ProjectId,
-                pm.UserId,
-                u.FirstName,
-                u.LastName,
-                u.Email,
-                pm.Role,
-                pm.JoinedAt)
-        ).ToListAsync(cancellationToken);
+            select new { pm, u };
 
-        return members;
+        int totalCount = await membersQuery.CountAsync(cancellationToken);
+
+        List<ProjectMemberResponse> members = await membersQuery
+            .OrderBy(x => x.pm.JoinedAt)
+            .ThenBy(x => x.pm.Id)
+            .Skip(skip)
+            .Take(pageSize)
+            .Select(x => new ProjectMemberResponse(
+                x.pm.Id,
+                x.pm.ProjectId,
+                x.pm.UserId,
+                x.u.FirstName,
+                x.u.LastName,
+                x.u.Email,
+                x.pm.Role,
+                x.pm.JoinedAt))
+            .ToListAsync(cancellationToken);
+
+        return PagedResponse<ProjectMemberResponse>.Create(
+            members,
+            pageNumber,
+            pageSize,
+            totalCount);
     }
 }

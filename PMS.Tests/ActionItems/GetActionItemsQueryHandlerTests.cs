@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.ActionItems.GetActionItems;
 using PMS.Domain.ActionItems;
@@ -40,7 +41,7 @@ public class GetActionItemsQueryHandlerTests
         var query = new GetActionItemsQuery(Guid.NewGuid());
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
@@ -63,7 +64,7 @@ public class GetActionItemsQueryHandlerTests
         var query = new GetActionItemsQuery(nonExistentProjectId);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
@@ -99,7 +100,7 @@ public class GetActionItemsQueryHandlerTests
         var query = new GetActionItemsQuery(project.Id);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
@@ -144,12 +145,12 @@ public class GetActionItemsQueryHandlerTests
         var query = new GetActionItemsQuery(project.Id);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeEmpty();
+        result.Value.Items.Should().BeEmpty();
     }
 
     [Fact]
@@ -202,17 +203,17 @@ public class GetActionItemsQueryHandlerTests
         dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
 
         var handler = new GetActionItemsQueryHandler(context, userContext, dateTimeProvider);
-        var query = new GetActionItemsQuery(projectId);
+        var query = new GetActionItemsQuery(projectId, Statuses: [(int)ActionItemStatus.Plan]);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(1);
+        result.Value.Items.Should().HaveCount(1);
 
-        ActionItemResponse item = result.Value.First();
+        ActionItemResponse item = result.Value.Items.First();
         item.ActionItemName.Should().Be("Task 1");
         item.CategoryName.Should().Be("Planning");
         item.ComputedStatus.Should().Be((int)ActionItemStatus.Plan);
@@ -273,15 +274,15 @@ public class GetActionItemsQueryHandlerTests
         dateTimeProvider.UtcNow.Returns(new DateTime(2026, 3, 15));
 
         var handler = new GetActionItemsQueryHandler(context, userContext, dateTimeProvider);
-        var query = new GetActionItemsQuery(projectId);
+        var query = new GetActionItemsQuery(projectId, Statuses: [(int)ActionItemStatus.Ongoing]);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        ActionItemResponse item = result.Value.First();
+        ActionItemResponse item = result.Value.Items.First();
         item.ComputedStatus.Should().Be((int)ActionItemStatus.Ongoing);
         item.ComputedStatusLabel.Should().Be("Ongoing");
         item.PlannedSchedule.Should().NotBeNull();
@@ -334,15 +335,15 @@ public class GetActionItemsQueryHandlerTests
         dateTimeProvider.UtcNow.Returns(new DateTime(2026, 3, 1)); // Past PlannedEndDate
 
         var handler = new GetActionItemsQueryHandler(context, userContext, dateTimeProvider);
-        var query = new GetActionItemsQuery(projectId);
+        var query = new GetActionItemsQuery(projectId, Statuses: [(int)ActionItemStatus.Delayed]);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        ActionItemResponse item = result.Value.First();
+        ActionItemResponse item = result.Value.Items.First();
         item.ComputedStatus.Should().Be((int)ActionItemStatus.Delayed);
         item.ComputedStatusLabel.Should().Be("Delayed");
     }
@@ -399,12 +400,14 @@ public class GetActionItemsQueryHandlerTests
         var handler = new GetActionItemsQueryHandler(context, userContext, dateTimeProvider);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
-            await handler.Handle(new GetActionItemsQuery(projectId), CancellationToken.None);
+        Result<PagedResponse<ActionItemResponse>> result =
+            await handler.Handle(
+                new GetActionItemsQuery(projectId, Statuses: [(int)ActionItemStatus.CompletedEarly]),
+                CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.First().ComputedStatus.Should().Be((int)ActionItemStatus.CompletedEarly);
+        result.Value.Items.First().ComputedStatus.Should().Be((int)ActionItemStatus.CompletedEarly);
     }
 
     [Fact]
@@ -459,12 +462,14 @@ public class GetActionItemsQueryHandlerTests
         var handler = new GetActionItemsQueryHandler(context, userContext, dateTimeProvider);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
-            await handler.Handle(new GetActionItemsQuery(projectId), CancellationToken.None);
+        Result<PagedResponse<ActionItemResponse>> result =
+            await handler.Handle(
+                new GetActionItemsQuery(projectId, Statuses: [(int)ActionItemStatus.CompletedOntime]),
+                CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.First().ComputedStatus.Should().Be((int)ActionItemStatus.CompletedOntime);
+        result.Value.Items.First().ComputedStatus.Should().Be((int)ActionItemStatus.CompletedOntime);
     }
 
     [Fact]
@@ -519,12 +524,14 @@ public class GetActionItemsQueryHandlerTests
         var handler = new GetActionItemsQueryHandler(context, userContext, dateTimeProvider);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
-            await handler.Handle(new GetActionItemsQuery(projectId), CancellationToken.None);
+        Result<PagedResponse<ActionItemResponse>> result =
+            await handler.Handle(
+                new GetActionItemsQuery(projectId, Statuses: [(int)ActionItemStatus.CompletedLate]),
+                CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.First().ComputedStatus.Should().Be((int)ActionItemStatus.CompletedLate);
+        result.Value.Items.First().ComputedStatus.Should().Be((int)ActionItemStatus.CompletedLate);
     }
 
     [Fact]
@@ -586,17 +593,91 @@ public class GetActionItemsQueryHandlerTests
         var handler = new GetActionItemsQueryHandler(context, userContext, dateTimeProvider);
 
         // Filter only Ongoing (status = 1)
-        var query = new GetActionItemsQuery(projectId, Statuses: [1]);
+        var query = new GetActionItemsQuery(projectId, Statuses: [1], PageSize: 1);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(1);
-        result.Value.First().ActionItemName.Should().Be("Ongoing Item");
-        result.Value.First().ComputedStatus.Should().Be((int)ActionItemStatus.Ongoing);
+        result.Value.Items.Should().HaveCount(1);
+        result.Value.Items.First().ActionItemName.Should().Be("Ongoing Item");
+        result.Value.Items.First().ComputedStatus.Should().Be((int)ActionItemStatus.Ongoing);
+        result.Value.TotalCount.Should().Be(1);
+        result.Value.TotalPages.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnRequestedPageWithMetadata_WhenMultiplePagesExist()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        Guid userId = Guid.NewGuid();
+        Guid projectId = Guid.NewGuid();
+        Guid categoryId = Guid.NewGuid();
+
+        context.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "Paged Project",
+            Description = "Description",
+            StartDate = new DateOnly(2026, 1, 1),
+            EndDate = new DateOnly(2026, 12, 31),
+            CreatedByUserId = userId
+        });
+        context.ProjectMembers.Add(new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            UserId = userId,
+            Role = UserRole.Member
+        });
+        context.Categories.Add(new Category
+        {
+            Id = categoryId,
+            ProjectId = projectId,
+            Name = "Paged Category"
+        });
+
+        for (int sequence = 1; sequence <= 5; sequence++)
+        {
+            context.ActionItems.Add(new ActionItem
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                CategoryId = categoryId,
+                ActionItemName = $"Item {sequence}",
+                Priority = Priority.Medium,
+                Sequence = sequence
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        IUserContext userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        userContext.IsSystemAdmin.Returns(false);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(new DateTime(2026, 1, 1));
+        var handler = new GetActionItemsQueryHandler(context, userContext, dateTimeProvider);
+        var query = new GetActionItemsQuery(projectId, PageNumber: 2, PageSize: 2);
+
+        // Act
+        Result<PagedResponse<ActionItemResponse>> result =
+            await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Select(item => item.ActionItemName)
+            .Should().Equal("Item 3", "Item 4");
+        result.Value.PageNumber.Should().Be(2);
+        result.Value.PageSize.Should().Be(2);
+        result.Value.TotalCount.Should().Be(5);
+        result.Value.TotalPages.Should().Be(3);
+        result.Value.HasPreviousPage.Should().BeTrue();
+        result.Value.HasNextPage.Should().BeTrue();
     }
 
     [Fact]
@@ -634,11 +715,11 @@ public class GetActionItemsQueryHandlerTests
         var query = new GetActionItemsQuery(projectId);
 
         // Act
-        Result<IReadOnlyCollection<ActionItemResponse>> result =
+        Result<PagedResponse<ActionItemResponse>> result =
             await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(1);
+        result.Value.Items.Should().HaveCount(1);
     }
 }

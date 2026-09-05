@@ -15,10 +15,14 @@ internal sealed class GetDashboard : IApiEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("api/dashboard", async (
+            int? pageNumber,
+            int? pageSize,
             IQueryHandler<GetDashboardQuery, DashboardResponse> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetDashboardQuery();
+            var query = new GetDashboardQuery(
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
             Result<DashboardResponse> result = await handler.Handle(query, cancellationToken);
 
@@ -28,7 +32,7 @@ internal sealed class GetDashboard : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("Get Dashboard KPIs")
-        .WithDescription("Retrieves aggregated KPI summary cards (Total, Completed, Ongoing, Delayed, Planned counts, and Progress %) for all projects the authenticated user belongs to.")
+        .WithDescription("Retrieves a paginated set of project KPI summary cards (Total, Completed, Ongoing, Delayed, Planned counts, and Progress %) for projects the authenticated user belongs to.")
         .WithTags(Tags.Dashboard);
     }
 }

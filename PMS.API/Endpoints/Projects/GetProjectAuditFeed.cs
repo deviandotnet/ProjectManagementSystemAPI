@@ -16,10 +16,15 @@ internal sealed class GetProjectAuditFeed : IApiEndpoint
     {
         app.MapGet("api/projects/{projectId:guid}/audit", async (
             Guid projectId,
+            int? pageNumber,
+            int? pageSize,
             IQueryHandler<GetProjectAuditFeedQuery, AuditFeedResponse> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetProjectAuditFeedQuery(projectId);
+            var query = new GetProjectAuditFeedQuery(
+                projectId,
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
             Result<AuditFeedResponse> result = await handler.Handle(query, cancellationToken);
 
@@ -29,7 +34,7 @@ internal sealed class GetProjectAuditFeed : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("Get Project Audit Feed")
-        .WithDescription("Retrieves the chronological audit log and human-readable activity feed for a project and all its child categories, subcategories, action items, schedules, and members. Requires TeamLead role or higher.")
+        .WithDescription("Retrieves a paginated chronological audit log and human-readable activity feed for a project and all its child categories, subcategories, action items, schedules, and members. Requires TeamLead role or higher.")
         .WithTags(Tags.Audit);
     }
 }

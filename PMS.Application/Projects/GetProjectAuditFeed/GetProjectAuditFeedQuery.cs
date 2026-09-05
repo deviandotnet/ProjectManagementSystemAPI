@@ -2,5 +2,8 @@ using PMS.Application.Abstractions.Messaging;
 
 namespace PMS.Application.Projects.GetProjectAuditFeed;
 
-public sealed record GetProjectAuditFeedQuery(Guid ProjectId)
+public sealed record GetProjectAuditFeedQuery(
+    Guid ProjectId,
+    int PageNumber = 1,
+    int PageSize = 20)
     : IQuery<AuditFeedResponse>;

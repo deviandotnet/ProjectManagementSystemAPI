@@ -26,7 +26,9 @@ internal sealed class GetActionItems : IApiEndpoint
             string? weekEnd,
             DateOnly? startDate,
             DateOnly? endDate,
-            IQueryHandler<GetActionItemsQuery, IReadOnlyCollection<ActionItemResponse>> handler,
+            int? pageNumber,
+            int? pageSize,
+            IQueryHandler<GetActionItemsQuery, PagedResponse<ActionItemResponse>> handler,
             CancellationToken cancellationToken) =>
         {
             int[]? statuses = null;
@@ -48,9 +50,11 @@ internal sealed class GetActionItems : IApiEndpoint
                 weekStart,
                 weekEnd,
                 startDate,
-                endDate);
+                endDate,
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
-            Result<IReadOnlyCollection<ActionItemResponse>> result =
+            Result<PagedResponse<ActionItemResponse>> result =
                 await handler.Handle(query, cancellationToken);
 
             return result.Match(
@@ -59,7 +63,7 @@ internal sealed class GetActionItems : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("List Action Items")
-        .WithDescription("Retrieves all action items for a project with computed status. Supports filtering by category, subcategory, status, priority, owner, search text, week range, and date range.")
+        .WithDescription("Retrieves a page of action items for a project with computed status. Supports filtering by category, subcategory, status, priority, owner, search text, week range, and date range.")
         .WithTags(Tags.ActionItems);
     }
 }

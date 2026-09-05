@@ -28,6 +28,8 @@ internal sealed class GetProjectAuditFeedQueryHandler(
         // ── 2. Project Existence Check ─────────────────────────────────────
         var project = await context.Projects
             .AsNoTracking()
+            .Where(p => p.Id == query.ProjectId)
+            .Select(p => new { p.Id, p.Name })
             .SingleOrDefaultAsync(p => p.Id == query.ProjectId, cancellationToken);
 
         if (project is null)
@@ -138,11 +140,21 @@ internal sealed class GetProjectAuditFeedQueryHandler(
         var allEntityIds = entityTitles.Keys.ToList();
 
         // ── 5. Query Audit Logs ─────────────────────────────────────────────
-        var auditLogs = await context.AuditLogs
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
+
+        var auditLogsQuery = context.AuditLogs
             .AsNoTracking()
-            .Where(al => allEntityIds.Contains(al.EntityId))
+            .Where(al => allEntityIds.Contains(al.EntityId));
+
+        int totalCount = await auditLogsQuery.CountAsync(cancellationToken);
+
+        var auditLogs = await auditLogsQuery
             .OrderByDescending(al => al.ChangedAt)
-            .Take(100)
+            .ThenByDescending(al => al.Id)
+            .Skip(skip)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         // ── 6. Format Human-Readable Activity Messages ─────────────────────
@@ -171,7 +183,18 @@ internal sealed class GetProjectAuditFeedQueryHandler(
             );
         }).ToList();
 
-        return new AuditFeedResponse(project.Id, project.Name, feedItems);
+        int totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        return new AuditFeedResponse(
+            project.Id,
+            project.Name,
+            feedItems,
+            pageNumber,
+            pageSize,
+            totalCount,
+            totalPages,
+            pageNumber > 1,
+            pageNumber < totalPages);
     }
 
     private static string FormatActivityMessage(

@@ -1,10 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
-using PMS.Domain.ActualExecutions;
-using PMS.Domain.PlannedSchedules;
 using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.SharedKernel;
@@ -15,30 +14,27 @@ internal sealed class GetActionItemsQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext,
     IDateTimeProvider dateTimeProvider)
-    : IQueryHandler<GetActionItemsQuery, IReadOnlyCollection<ActionItemResponse>>
+    : IQueryHandler<GetActionItemsQuery, PagedResponse<ActionItemResponse>>
 {
-    public async Task<Result<IReadOnlyCollection<ActionItemResponse>>> Handle(
+    public async Task<Result<PagedResponse<ActionItemResponse>>> Handle(
         GetActionItemsQuery query,
         CancellationToken cancellationToken)
     {
-        // ── Auth check ─────────────────────────────────────────────────────
         if (!userContext.IsAuthenticated || !userContext.UserId.HasValue)
         {
-            return Result.Failure<IReadOnlyCollection<ActionItemResponse>>(UserErrors.Unauthorized);
+            return Result.Failure<PagedResponse<ActionItemResponse>>(UserErrors.Unauthorized);
         }
 
         Guid userId = userContext.UserId.Value;
 
-        // ── Project existence check ────────────────────────────────────────
         bool projectExists = await context.Projects
             .AnyAsync(p => p.Id == query.ProjectId, cancellationToken);
 
         if (!projectExists)
         {
-            return Result.Failure<IReadOnlyCollection<ActionItemResponse>>(ProjectErrors.NotFound(query.ProjectId));
+            return Result.Failure<PagedResponse<ActionItemResponse>>(ProjectErrors.NotFound(query.ProjectId));
         }
 
-        // ── Project membership check ───────────────────────────────────────
         if (!userContext.IsSystemAdmin)
         {
             bool isMember = await context.ProjectMembers
@@ -46,11 +42,10 @@ internal sealed class GetActionItemsQueryHandler(
 
             if (!isMember)
             {
-                return Result.Failure<IReadOnlyCollection<ActionItemResponse>>(ActionItemErrors.NotProjectMember);
+                return Result.Failure<PagedResponse<ActionItemResponse>>(ActionItemErrors.NotProjectMember);
             }
         }
 
-        // ── Build base query with left joins ───────────────────────────────
         var dbQuery = from ai in context.ActionItems.AsNoTracking()
                       join c in context.Categories.AsNoTracking() on ai.CategoryId equals c.Id
                       join sc in context.SubCategories.AsNoTracking() on ai.SubCategoryId equals sc.Id into scGroup
@@ -62,7 +57,6 @@ internal sealed class GetActionItemsQueryHandler(
                       where ai.ProjectId == query.ProjectId
                       select new { ai, c, sc, ps, ae };
 
-        // ── Apply SQL-level filters ────────────────────────────────────────
         if (query.CategoryId.HasValue)
         {
             dbQuery = dbQuery.Where(x => x.ai.CategoryId == query.CategoryId.Value);
@@ -117,96 +111,138 @@ internal sealed class GetActionItemsQueryHandler(
                                          string.Compare(x.ps.PlannedEndWeek, weekEnd) <= 0);
         }
 
-        // ── Execute query ──────────────────────────────────────────────────
-        var rawItems = await dbQuery
-            .OrderBy(x => x.ai.Sequence)
-            .ToListAsync(cancellationToken);
-
-        // ── Compute status & map to response DTOs ──────────────────────────
         DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
 
-        IEnumerable<ActionItemResponse> results = rawItems.Select(x =>
+        if (query.Statuses is { Length: > 0 })
         {
-            ActionItemStatus status = ComputeStatus(x.ps, x.ae, today);
+            bool includePlan = query.Statuses.Contains((int)ActionItemStatus.Plan);
+            bool includeOngoing = query.Statuses.Contains((int)ActionItemStatus.Ongoing);
+            bool includeDelayed = query.Statuses.Contains((int)ActionItemStatus.Delayed);
+            bool includeCompletedEarly = query.Statuses.Contains((int)ActionItemStatus.CompletedEarly);
+            bool includeCompletedOntime = query.Statuses.Contains((int)ActionItemStatus.CompletedOntime);
+            bool includeCompletedLate = query.Statuses.Contains((int)ActionItemStatus.CompletedLate);
 
-            return new ActionItemResponse(
+            dbQuery = dbQuery.Where(x =>
+                (includePlan &&
+                    (x.ps == null ||
+                     (x.ae == null || (!x.ae.ActualStartDate.HasValue && !x.ae.ActualEndDate.HasValue)) &&
+                     today <= x.ps.PlannedEndDate)) ||
+                (includeOngoing && x.ps != null && x.ae != null &&
+                    x.ae.ActualStartDate.HasValue && !x.ae.ActualEndDate.HasValue) ||
+                (includeDelayed && x.ps != null &&
+                    (x.ae == null || (!x.ae.ActualStartDate.HasValue && !x.ae.ActualEndDate.HasValue)) &&
+                    today > x.ps.PlannedEndDate) ||
+                (includeCompletedEarly && x.ps != null && x.ae != null &&
+                    x.ae.ActualEndDate.HasValue && x.ae.ActualEndDate < x.ps.PlannedEndDate) ||
+                (includeCompletedOntime && x.ps != null && x.ae != null &&
+                    x.ae.ActualEndDate.HasValue && x.ae.ActualEndDate == x.ps.PlannedEndDate) ||
+                (includeCompletedLate && x.ps != null && x.ae != null &&
+                    x.ae.ActualEndDate.HasValue && x.ae.ActualEndDate > x.ps.PlannedEndDate));
+        }
+
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int itemsToSkip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
+        int totalCount = await dbQuery.CountAsync(cancellationToken);
+
+        List<ActionItemReadModel> rawItems = await dbQuery
+            .OrderBy(x => x.ai.Sequence)
+            .ThenBy(x => x.ai.Id)
+            .Skip(itemsToSkip)
+            .Take(pageSize)
+            .Select(x => new ActionItemReadModel(
                 x.ai.Id,
                 x.ai.ActionItemName,
                 x.ai.CategoryId,
                 x.c.Name,
                 x.ai.SubCategoryId,
-                x.sc?.Name,
+                x.sc == null ? null : x.sc.Name,
                 (int)x.ai.Priority,
                 x.ai.OwnerName,
                 x.ai.Sequence,
-                x.ps is null
+                x.ps == null ? null : x.ps.Id,
+                x.ps == null ? null : x.ps.PlannedStartDate,
+                x.ps == null ? null : x.ps.PlannedEndDate,
+                x.ps == null ? null : x.ps.PlannedStartWeek,
+                x.ps == null ? null : x.ps.PlannedEndWeek,
+                x.ps == null ? null : x.ps.DurationCalendarDays,
+                x.ps == null ? null : x.ps.DurationWorkingDays,
+                x.ae == null ? null : x.ae.Id,
+                x.ae == null ? null : x.ae.ActualStartDate,
+                x.ae == null ? null : x.ae.ActualEndDate,
+                x.ae == null ? null : x.ae.ActualHours,
+                x.ae == null ? null : x.ae.DelayReason,
+                x.ai.Weight,
+                x.ai.Remarks))
+            .ToListAsync(cancellationToken);
+
+        List<ActionItemResponse> items = rawItems.Select(item =>
+        {
+            ActionItemStatus status = ActionItemStatusService.ComputeStatus(
+                item.PlannedEndDate,
+                item.ActualStartDate,
+                item.ActualEndDate,
+                today);
+
+            return new ActionItemResponse(
+                item.Id,
+                item.ActionItemName,
+                item.CategoryId,
+                item.CategoryName,
+                item.SubCategoryId,
+                item.SubCategoryName,
+                item.Priority,
+                item.OwnerName,
+                item.Sequence,
+                item.PlannedScheduleId is null
                     ? null
                     : new PlannedScheduleResponse(
-                        x.ps.Id,
-                        x.ps.PlannedStartDate,
-                        x.ps.PlannedEndDate,
-                        x.ps.PlannedStartWeek,
-                        x.ps.PlannedEndWeek,
-                        x.ps.DurationCalendarDays,
-                        x.ps.DurationWorkingDays),
-                x.ae is null
+                        item.PlannedScheduleId.Value,
+                        item.PlannedStartDate!.Value,
+                        item.PlannedEndDate!.Value,
+                        item.PlannedStartWeek!,
+                        item.PlannedEndWeek!,
+                        item.DurationCalendarDays!.Value,
+                        item.DurationWorkingDays!.Value),
+                item.ActualExecutionId is null
                     ? null
                     : new ActualExecutionResponse(
-                        x.ae.Id,
-                        x.ae.ActualStartDate,
-                        x.ae.ActualEndDate,
-                        x.ae.ActualHours,
-                        x.ae.DelayReason),
+                        item.ActualExecutionId.Value,
+                        item.ActualStartDate,
+                        item.ActualEndDate,
+                        item.ActualHours,
+                        item.DelayReason),
                 (int)status,
                 status.ToString(),
-                x.ai.Weight,
-                x.ai.Remarks);
-        });
+                item.Weight,
+                item.Remarks);
+        }).ToList();
 
-        // ── Filter by computed status (post-query) ─────────────────────────
-        if (query.Statuses is { Length: > 0 })
-        {
-            results = results.Where(r => query.Statuses.Contains(r.ComputedStatus));
-        }
-
-        return results.ToList();
+        return PagedResponse<ActionItemResponse>.Create(items, pageNumber, pageSize, totalCount);
     }
 
-    /// <summary>
-    /// Computes the ActionItemStatus at runtime based on the Status Engine rules
-    /// defined in schema.md. Status is NEVER stored in the database.
-    /// </summary>
-    private static ActionItemStatus ComputeStatus(
-        PlannedSchedule? planned,
-        ActualExecution? actual,
-        DateOnly today)
-    {
-        if (planned is null)
-        {
-            return ActionItemStatus.Plan;
-        }
-
-        if (actual?.ActualEndDate is not null)
-        {
-            if (actual.ActualEndDate < planned.PlannedEndDate)
-                return ActionItemStatus.CompletedEarly;
-
-            if (actual.ActualEndDate == planned.PlannedEndDate)
-                return ActionItemStatus.CompletedOntime;
-
-            return ActionItemStatus.CompletedLate;
-        }
-
-        if (actual?.ActualStartDate is not null)
-        {
-            return ActionItemStatus.Ongoing;
-        }
-
-        if (today > planned.PlannedEndDate)
-        {
-            return ActionItemStatus.Delayed;
-        }
-
-        return ActionItemStatus.Plan;
-    }
+    private sealed record ActionItemReadModel(
+        Guid Id,
+        string ActionItemName,
+        Guid CategoryId,
+        string CategoryName,
+        Guid? SubCategoryId,
+        string? SubCategoryName,
+        int Priority,
+        string? OwnerName,
+        int Sequence,
+        Guid? PlannedScheduleId,
+        DateOnly? PlannedStartDate,
+        DateOnly? PlannedEndDate,
+        string? PlannedStartWeek,
+        string? PlannedEndWeek,
+        int? DurationCalendarDays,
+        int? DurationWorkingDays,
+        Guid? ActualExecutionId,
+        DateOnly? ActualStartDate,
+        DateOnly? ActualEndDate,
+        decimal? ActualHours,
+        string? DelayReason,
+        decimal? Weight,
+        string? Remarks);
 }

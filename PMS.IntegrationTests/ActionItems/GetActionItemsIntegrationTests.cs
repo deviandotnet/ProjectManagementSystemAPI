@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PMS.API;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.ActionItems.GetActionItems;
 using PMS.Domain.ActionItems;
@@ -158,12 +159,86 @@ public class GetActionItemsIntegrationTests : IClassFixture<WebApplicationFactor
 
             // Assert
             response.StatusCode.Should().Be(HttpStatusCode.OK);
-            var items = await response.Content.ReadFromJsonAsync<List<ActionItemResponse>>();
-            items.Should().NotBeNull();
-            items.Should().ContainSingle(ai => ai.ActionItemName == "Setup CI/CD Pipeline");
-            items!.First().CategoryName.Should().Be("Core Planning");
-            items.First().PlannedSchedule.Should().NotBeNull();
-            items.First().PlannedSchedule!.PlannedStartWeek.Should().Be("WW01");
+            var page = await response.Content.ReadFromJsonAsync<PagedResponse<ActionItemResponse>>();
+            page.Should().NotBeNull();
+            page!.Items.Should().ContainSingle(ai => ai.ActionItemName == "Setup CI/CD Pipeline");
+            page.Items.First().CategoryName.Should().Be("Core Planning");
+            page.Items.First().PlannedSchedule.Should().NotBeNull();
+            page.Items.First().PlannedSchedule!.PlannedStartWeek.Should().Be("WW01");
+            page.PageNumber.Should().Be(1);
+            page.PageSize.Should().Be(20);
+            page.TotalCount.Should().Be(1);
+            page.TotalPages.Should().Be(1);
+            page.HasPreviousPage.Should().BeFalse();
+            page.HasNextPage.Should().BeFalse();
         }
+    }
+
+    [Fact]
+    public async Task GetActionItems_Should_ReturnRequestedPageWithMetadata_WhenPaginationIsSpecified()
+    {
+        // Arrange
+        var (user, client) = await CreateAuthenticatedClientAsync();
+        Guid projectId = Guid.NewGuid();
+        Guid categoryId = Guid.NewGuid();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.Projects.Add(new Project
+            {
+                Id = projectId,
+                Name = "Paginated Project",
+                Description = "Description",
+                StartDate = new DateOnly(2026, 1, 1),
+                EndDate = new DateOnly(2026, 12, 31),
+                CreatedByUserId = user.Id
+            });
+            context.ProjectMembers.Add(new ProjectMember
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                UserId = user.Id,
+                Role = UserRole.Member
+            });
+            context.Categories.Add(new Category
+            {
+                Id = categoryId,
+                ProjectId = projectId,
+                Name = "Paginated Category"
+            });
+
+            for (int sequence = 1; sequence <= 3; sequence++)
+            {
+                context.ActionItems.Add(new ActionItem
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectId = projectId,
+                    CategoryId = categoryId,
+                    ActionItemName = $"Page Item {sequence}",
+                    Priority = Priority.Medium,
+                    Sequence = sequence
+                });
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        HttpResponseMessage response = await client.GetAsync(
+            $"api/projects/{projectId}/action-items?pageNumber=2&pageSize=1");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await response.Content.ReadFromJsonAsync<PagedResponse<ActionItemResponse>>();
+        page.Should().NotBeNull();
+        page!.Items.Should().ContainSingle();
+        page.Items.First().ActionItemName.Should().Be("Page Item 2");
+        page.PageNumber.Should().Be(2);
+        page.PageSize.Should().Be(1);
+        page.TotalCount.Should().Be(3);
+        page.TotalPages.Should().Be(3);
+        page.HasPreviousPage.Should().BeTrue();
+        page.HasNextPage.Should().BeTrue();
     }
 }

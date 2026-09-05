@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PMS.API;
 using PMS.API.Endpoints.Categories;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Categories.GetCategoriesByProjectId;
 using PMS.Domain.ProjectMembers;
@@ -138,8 +139,43 @@ public class CategoryIntegrationTests : IClassFixture<WebApplicationFactory<Prog
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var categories = await response.Content.ReadFromJsonAsync<List<CategoryResponse>>();
+        var categories = await response.Content.ReadFromJsonAsync<PagedResponse<CategoryResponse>>();
         categories.Should().NotBeNull();
-        categories.Should().ContainSingle(c => c.Name == "Backend");
+        categories!.Items.Should().ContainSingle(c => c.Name == "Backend");
+        categories.TotalCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetCategories_Should_ReturnRequestedPageInDisplayOrder()
+    {
+        // Arrange
+        var (user, client) = await CreateAuthenticatedClientAsync();
+        Guid projectId = await CreateProjectWithMemberAsync(user.Id);
+
+        for (int displayOrder = 1; displayOrder <= 3; displayOrder++)
+        {
+            await client.PostAsJsonAsync(
+                $"api/projects/{projectId}/categories",
+                new CreateCategory.CreateCategoryRequest(
+                    $"Category {displayOrder}",
+                    displayOrder,
+                    null));
+        }
+
+        // Act
+        HttpResponseMessage response = await client.GetAsync(
+            $"api/projects/{projectId}/categories?pageNumber=2&pageSize=1");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        PagedResponse<CategoryResponse>? page =
+            await response.Content.ReadFromJsonAsync<PagedResponse<CategoryResponse>>();
+        page.Should().NotBeNull();
+        page!.Items.Should().ContainSingle();
+        page.Items.Single().Name.Should().Be("Category 2");
+        page.PageNumber.Should().Be(2);
+        page.PageSize.Should().Be(1);
+        page.TotalCount.Should().Be(3);
+        page.TotalPages.Should().Be(3);
     }
 }

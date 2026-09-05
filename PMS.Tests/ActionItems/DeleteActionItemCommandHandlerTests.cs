@@ -123,8 +123,5 @@ public class DeleteActionItemCommandHandlerTests
 
         ActionItem? deletedItem = await context.ActionItems.SingleOrDefaultAsync(a => a.Id == actionItemId);
         deletedItem.Should().BeNull();
-
-        PlannedSchedule? deletedSchedule = await context.PlannedSchedules.SingleOrDefaultAsync(s => s.ActionItemId == actionItemId);
-        deletedSchedule.Should().BeNull();
     }
 }

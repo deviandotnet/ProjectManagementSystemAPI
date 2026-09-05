@@ -17,12 +17,18 @@ internal sealed class GetActionItemHistory : IApiEndpoint
         app.MapGet("api/projects/{projectId:guid}/action-items/{id:guid}/history", async (
             Guid projectId,
             Guid id,
-            IQueryHandler<GetActionItemHistoryQuery, IReadOnlyCollection<ActionItemHistoryResponse>> handler,
+            int? pageNumber,
+            int? pageSize,
+            IQueryHandler<GetActionItemHistoryQuery, PagedResponse<ActionItemHistoryResponse>> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetActionItemHistoryQuery(projectId, id);
+            var query = new GetActionItemHistoryQuery(
+                projectId,
+                id,
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
-            Result<IReadOnlyCollection<ActionItemHistoryResponse>> result = await handler.Handle(query, cancellationToken);
+            Result<PagedResponse<ActionItemHistoryResponse>> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
                 history => Results.Ok(history),
@@ -30,18 +36,24 @@ internal sealed class GetActionItemHistory : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("Get Action Item Audit History")
-        .WithDescription("Retrieves the full audit log history of changes performed on a specific action item.")
+        .WithDescription("Retrieves a paginated audit log history of changes performed on a specific action item.")
         .WithTags(Tags.ActionItems, Tags.Audit);
 
         app.MapGet("api/projects/{projectId:guid}/action-items/{id:guid}/audit", async (
             Guid projectId,
             Guid id,
-            IQueryHandler<GetActionItemHistoryQuery, IReadOnlyCollection<ActionItemHistoryResponse>> handler,
+            int? pageNumber,
+            int? pageSize,
+            IQueryHandler<GetActionItemHistoryQuery, PagedResponse<ActionItemHistoryResponse>> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetActionItemHistoryQuery(projectId, id);
+            var query = new GetActionItemHistoryQuery(
+                projectId,
+                id,
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
-            Result<IReadOnlyCollection<ActionItemHistoryResponse>> result = await handler.Handle(query, cancellationToken);
+            Result<PagedResponse<ActionItemHistoryResponse>> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
                 history => Results.Ok(history),
@@ -49,7 +61,7 @@ internal sealed class GetActionItemHistory : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("Get Action Item Audit Feed")
-        .WithDescription("Retrieves the full audit feed with human-readable change messages for a specific action item.")
+        .WithDescription("Retrieves a paginated audit feed with human-readable change messages for a specific action item.")
         .WithTags(Tags.Audit, Tags.ActionItems);
     }
 }

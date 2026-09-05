@@ -3,8 +3,6 @@ using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
-using PMS.Domain.ActualExecutions;
-using PMS.Domain.PlannedSchedules;
 using PMS.Domain.ProjectMembers;
 using PMS.Domain.Projects;
 using PMS.Domain.Users;
@@ -70,23 +68,7 @@ internal sealed class DeleteActionItemCommandHandler(
             }
         }
 
-        // ── 5. Cascade Delete Children & ActionItem ───────────────────────
-        PlannedSchedule? schedule = await context.PlannedSchedules
-            .SingleOrDefaultAsync(s => s.ActionItemId == actionItem.Id, cancellationToken);
-
-        if (schedule is not null)
-        {
-            context.PlannedSchedules.Remove(schedule);
-        }
-
-        ActualExecution? execution = await context.ActualExecutions
-            .SingleOrDefaultAsync(a => a.ActionItemId == actionItem.Id, cancellationToken);
-
-        if (execution is not null)
-        {
-            context.ActualExecutions.Remove(execution);
-        }
-
+        // ── 5. Delete ActionItem (DB cascade deletes PlannedSchedule & ActualExecution)
         actionItem.Raise(new ActionItemDeletedDomainEvent(actionItem.Id, actionItem.ProjectId));
 
         context.ActionItems.Remove(actionItem);

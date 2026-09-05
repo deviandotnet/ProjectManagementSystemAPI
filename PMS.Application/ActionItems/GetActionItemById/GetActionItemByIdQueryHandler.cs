@@ -3,8 +3,6 @@ using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
-using PMS.Domain.ActualExecutions;
-using PMS.Domain.PlannedSchedules;
 using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.SharedKernel;
@@ -50,18 +48,42 @@ internal sealed class GetActionItemByIdQueryHandler(
             }
         }
 
-        // ── 4. Fetch Action Item with Left Joins ───────────────────────────
-        var rawItem = await (from ai in context.ActionItems.AsNoTracking()
-                             join c in context.Categories.AsNoTracking() on ai.CategoryId equals c.Id
-                             join sc in context.SubCategories.AsNoTracking() on ai.SubCategoryId equals sc.Id into scGroup
-                             from sc in scGroup.DefaultIfEmpty()
-                             join ps in context.PlannedSchedules.AsNoTracking() on ai.Id equals ps.ActionItemId into psGroup
-                             from ps in psGroup.DefaultIfEmpty()
-                             join ae in context.ActualExecutions.AsNoTracking() on ai.Id equals ae.ActionItemId into aeGroup
-                             from ae in aeGroup.DefaultIfEmpty()
-                             where ai.Id == query.ActionItemId && ai.ProjectId == query.ProjectId
-                             select new { ai, c, sc, ps, ae })
-                            .SingleOrDefaultAsync(cancellationToken);
+        // ── 4. Fetch only fields required by the response ─────────────────
+        ActionItemReadModel? rawItem = await (
+            from ai in context.ActionItems.AsNoTracking()
+            join c in context.Categories.AsNoTracking() on ai.CategoryId equals c.Id
+            join sc in context.SubCategories.AsNoTracking() on ai.SubCategoryId equals sc.Id into scGroup
+            from sc in scGroup.DefaultIfEmpty()
+            join ps in context.PlannedSchedules.AsNoTracking() on ai.Id equals ps.ActionItemId into psGroup
+            from ps in psGroup.DefaultIfEmpty()
+            join ae in context.ActualExecutions.AsNoTracking() on ai.Id equals ae.ActionItemId into aeGroup
+            from ae in aeGroup.DefaultIfEmpty()
+            where ai.Id == query.ActionItemId && ai.ProjectId == query.ProjectId
+            select new ActionItemReadModel(
+                ai.Id,
+                ai.ActionItemName,
+                ai.CategoryId,
+                c.Name,
+                ai.SubCategoryId,
+                sc == null ? null : sc.Name,
+                (int)ai.Priority,
+                ai.OwnerName,
+                ai.Sequence,
+                ps == null ? null : ps.Id,
+                ps == null ? null : ps.PlannedStartDate,
+                ps == null ? null : ps.PlannedEndDate,
+                ps == null ? null : ps.PlannedStartWeek,
+                ps == null ? null : ps.PlannedEndWeek,
+                ps == null ? null : ps.DurationCalendarDays,
+                ps == null ? null : ps.DurationWorkingDays,
+                ae == null ? null : ae.Id,
+                ae == null ? null : ae.ActualStartDate,
+                ae == null ? null : ae.ActualEndDate,
+                ae == null ? null : ae.ActualHours,
+                ae == null ? null : ae.DelayReason,
+                ai.Weight,
+                ai.Remarks))
+            .SingleOrDefaultAsync(cancellationToken);
 
         if (rawItem is null)
         {
@@ -70,73 +92,68 @@ internal sealed class GetActionItemByIdQueryHandler(
 
         // ── 5. Dynamic Status Engine Computation ───────────────────────────
         DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
-        ActionItemStatus status = ComputeStatus(rawItem.ps, rawItem.ae, today);
+        ActionItemStatus status = ActionItemStatusService.ComputeStatus(
+            rawItem.PlannedEndDate,
+            rawItem.ActualStartDate,
+            rawItem.ActualEndDate,
+            today);
 
         return new ActionItemResponse(
-            rawItem.ai.Id,
-            rawItem.ai.ActionItemName,
-            rawItem.ai.CategoryId,
-            rawItem.c.Name,
-            rawItem.ai.SubCategoryId,
-            rawItem.sc?.Name,
-            (int)rawItem.ai.Priority,
-            rawItem.ai.OwnerName,
-            rawItem.ai.Sequence,
-            rawItem.ps is null
+            rawItem.Id,
+            rawItem.ActionItemName,
+            rawItem.CategoryId,
+            rawItem.CategoryName,
+            rawItem.SubCategoryId,
+            rawItem.SubCategoryName,
+            rawItem.Priority,
+            rawItem.OwnerName,
+            rawItem.Sequence,
+            rawItem.PlannedScheduleId is null
                 ? null
                 : new PlannedScheduleResponse(
-                    rawItem.ps.Id,
-                    rawItem.ps.PlannedStartDate,
-                    rawItem.ps.PlannedEndDate,
-                    rawItem.ps.PlannedStartWeek,
-                    rawItem.ps.PlannedEndWeek,
-                    rawItem.ps.DurationCalendarDays,
-                    rawItem.ps.DurationWorkingDays),
-            rawItem.ae is null
+                    rawItem.PlannedScheduleId.Value,
+                    rawItem.PlannedStartDate!.Value,
+                    rawItem.PlannedEndDate!.Value,
+                    rawItem.PlannedStartWeek!,
+                    rawItem.PlannedEndWeek!,
+                    rawItem.DurationCalendarDays!.Value,
+                    rawItem.DurationWorkingDays!.Value),
+            rawItem.ActualExecutionId is null
                 ? null
                 : new ActualExecutionResponse(
-                    rawItem.ae.Id,
-                    rawItem.ae.ActualStartDate,
-                    rawItem.ae.ActualEndDate,
-                    rawItem.ae.ActualHours,
-                    rawItem.ae.DelayReason),
+                    rawItem.ActualExecutionId.Value,
+                    rawItem.ActualStartDate,
+                    rawItem.ActualEndDate,
+                    rawItem.ActualHours,
+                    rawItem.DelayReason),
             (int)status,
             status.ToString(),
-            rawItem.ai.Weight,
-            rawItem.ai.Remarks);
+            rawItem.Weight,
+            rawItem.Remarks);
     }
 
-    private static ActionItemStatus ComputeStatus(
-        PlannedSchedule? planned,
-        ActualExecution? actual,
-        DateOnly today)
-    {
-        if (planned is null)
-        {
-            return ActionItemStatus.Plan;
-        }
-
-        if (actual?.ActualEndDate is not null)
-        {
-            if (actual.ActualEndDate < planned.PlannedEndDate)
-                return ActionItemStatus.CompletedEarly;
-
-            if (actual.ActualEndDate == planned.PlannedEndDate)
-                return ActionItemStatus.CompletedOntime;
-
-            return ActionItemStatus.CompletedLate;
-        }
-
-        if (actual?.ActualStartDate is not null)
-        {
-            return ActionItemStatus.Ongoing;
-        }
-
-        if (today > planned.PlannedEndDate)
-        {
-            return ActionItemStatus.Delayed;
-        }
-
-        return ActionItemStatus.Plan;
-    }
+    private sealed record ActionItemReadModel(
+        Guid Id,
+        string ActionItemName,
+        Guid CategoryId,
+        string CategoryName,
+        Guid? SubCategoryId,
+        string? SubCategoryName,
+        int Priority,
+        string? OwnerName,
+        int Sequence,
+        Guid? PlannedScheduleId,
+        DateOnly? PlannedStartDate,
+        DateOnly? PlannedEndDate,
+        string? PlannedStartWeek,
+        string? PlannedEndWeek,
+        int? DurationCalendarDays,
+        int? DurationWorkingDays,
+        Guid? ActualExecutionId,
+        DateOnly? ActualStartDate,
+        DateOnly? ActualEndDate,
+        decimal? ActualHours,
+        string? DelayReason,
+        decimal? Weight,
+        string? Remarks);
 }

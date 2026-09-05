@@ -19,10 +19,18 @@ internal sealed class GetTimeline : IApiEndpoint
             TimelineScale? scale,
             DateOnly? startDate,
             DateOnly? endDate,
+            int? pageNumber,
+            int? pageSize,
             IQueryHandler<GetTimelineQuery, TimelineResponse> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetTimelineQuery(projectId, scale, startDate, endDate);
+            var query = new GetTimelineQuery(
+                projectId,
+                scale,
+                startDate,
+                endDate,
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
             Result<TimelineResponse> result = await handler.Handle(query, cancellationToken);
 
@@ -32,7 +40,7 @@ internal sealed class GetTimeline : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("Get Project Timeline")
-        .WithDescription("Calculates and returns structured grid timeline data (date columns, row hierarchy, week column indexes, and status labels) for CSS Grid rendering.")
+        .WithDescription("Calculates and returns paginated timeline rows with date columns, row hierarchy, week column indexes, and status labels for CSS Grid rendering.")
         .WithTags(Tags.Projects);
     }
 }

@@ -16,12 +16,17 @@ internal sealed class GetCategoriesByProjectId : IApiEndpoint
     {
         app.MapGet("api/projects/{projectId:guid}/categories", async (
             Guid projectId,
-            IQueryHandler<GetCategoriesByProjectIdQuery, IReadOnlyCollection<CategoryResponse>> handler,
+            int? pageNumber,
+            int? pageSize,
+            IQueryHandler<GetCategoriesByProjectIdQuery, PagedResponse<CategoryResponse>> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetCategoriesByProjectIdQuery(projectId);
+            var query = new GetCategoriesByProjectIdQuery(
+                projectId,
+                pageNumber ?? 1,
+                pageSize ?? 20);
 
-            Result<IReadOnlyCollection<CategoryResponse>> result = await handler.Handle(query, cancellationToken);
+            Result<PagedResponse<CategoryResponse>> result = await handler.Handle(query, cancellationToken);
 
             return result.Match(
                 categories => Results.Ok(categories),
@@ -29,7 +34,7 @@ internal sealed class GetCategoriesByProjectId : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("Get Categories by Project ID")
-        .WithDescription("Retrieves all categories within a project ordered by display order.")
+        .WithDescription("Retrieves a paginated list of categories within a project ordered by display order.")
         .WithTags(Tags.Categories);
     }
 }

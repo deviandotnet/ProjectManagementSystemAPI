@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Categories.GetCategoriesByProjectId;
 using PMS.Domain.Categories;
@@ -62,11 +63,68 @@ public class GetCategoriesByProjectIdQueryHandlerTests
         var query = new GetCategoriesByProjectIdQuery(project.Id);
 
         // Act
-        Result<IReadOnlyCollection<CategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
+        Result<PagedResponse<CategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(2);
-        result.Value.First().Name.Should().Be("Cat 2"); // DisplayOrder = 1
+        result.Value.Items.Should().HaveCount(2);
+        result.Value.Items.First().Name.Should().Be("Cat 2"); // DisplayOrder = 1
+        result.Value.PageNumber.Should().Be(1);
+        result.Value.PageSize.Should().Be(20);
+        result.Value.TotalCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnRequestedCategoryPageInDisplayOrder()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        Guid userId = Guid.NewGuid();
+        Guid projectId = Guid.NewGuid();
+        context.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "Paged Categories",
+            StartDate = new DateOnly(2026, 1, 1),
+            EndDate = new DateOnly(2026, 12, 31),
+            CreatedByUserId = userId
+        });
+        context.ProjectMembers.Add(new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            UserId = userId,
+            Role = UserRole.Member
+        });
+        for (int displayOrder = 1; displayOrder <= 3; displayOrder++)
+        {
+            context.Categories.Add(new Category
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                Name = $"Category {displayOrder}",
+                DisplayOrder = displayOrder
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        var handler = new GetCategoriesByProjectIdQueryHandler(context, userContext);
+        var query = new GetCategoriesByProjectIdQuery(projectId, PageNumber: 2, PageSize: 1);
+
+        // Act
+        Result<PagedResponse<CategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle();
+        result.Value.Items.Single().Name.Should().Be("Category 2");
+        result.Value.PageNumber.Should().Be(2);
+        result.Value.PageSize.Should().Be(1);
+        result.Value.TotalCount.Should().Be(3);
+        result.Value.TotalPages.Should().Be(3);
     }
 }

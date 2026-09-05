@@ -133,5 +133,79 @@ public class GetDashboardQueryHandlerTests
         p2Summary.MyRole.Should().Be("Member");
         p2Summary.TotalActionItems.Should().Be(0);
         p2Summary.ProgressPercent.Should().Be(0.0);
+        result.Value.PageNumber.Should().Be(1);
+        result.Value.PageSize.Should().Be(20);
+        result.Value.TotalCount.Should().Be(2);
+        result.Value.TotalPages.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_PageProjectsButCalculateAllItemsForSelectedProject()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        Guid userId = Guid.NewGuid();
+        var projects = new[]
+        {
+            new Project
+            {
+                Id = Guid.NewGuid(), Name = "Alpha", StartDate = new DateOnly(2026, 1, 1),
+                EndDate = new DateOnly(2026, 12, 31), CreatedByUserId = userId
+            },
+            new Project
+            {
+                Id = Guid.NewGuid(), Name = "Beta", StartDate = new DateOnly(2026, 1, 1),
+                EndDate = new DateOnly(2026, 12, 31), CreatedByUserId = userId
+            },
+            new Project
+            {
+                Id = Guid.NewGuid(), Name = "Gamma", StartDate = new DateOnly(2026, 1, 1),
+                EndDate = new DateOnly(2026, 12, 31), CreatedByUserId = userId
+            }
+        };
+        context.Projects.AddRange(projects);
+        context.ProjectMembers.AddRange(projects.Select(project => new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = project.Id,
+            UserId = userId,
+            Role = UserRole.Member
+        }));
+
+        for (int index = 1; index <= 2; index++)
+        {
+            context.ActionItems.Add(new ActionItem
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projects[1].Id,
+                CategoryId = Guid.NewGuid(),
+                ActionItemName = $"Beta Item {index}"
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(new DateTime(2026, 1, 1));
+        var handler = new GetDashboardQueryHandler(context, userContext, dateTimeProvider);
+        var query = new GetDashboardQuery(PageNumber: 2, PageSize: 1);
+
+        // Act
+        Result<DashboardResponse> result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Projects.Should().ContainSingle();
+        result.Value.Projects.Single().ProjectName.Should().Be("Beta");
+        result.Value.Projects.Single().TotalActionItems.Should().Be(2);
+        result.Value.PageNumber.Should().Be(2);
+        result.Value.PageSize.Should().Be(1);
+        result.Value.TotalCount.Should().Be(3);
+        result.Value.TotalPages.Should().Be(3);
+        result.Value.HasPreviousPage.Should().BeTrue();
+        result.Value.HasNextPage.Should().BeTrue();
     }
 }

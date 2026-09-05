@@ -180,5 +180,70 @@ public class GetProjectAuditFeedQueryHandlerTests
         var createFeedItem = result.Value.Feed.Last();
         createFeedItem.EntityName.Should().Be("Project");
         createFeedItem.ActivityMessage.Should().Contain("John Admin created Project 'Alpha Project'");
+        result.Value.PageNumber.Should().Be(1);
+        result.Value.PageSize.Should().Be(20);
+        result.Value.TotalCount.Should().Be(2);
+        result.Value.TotalPages.Should().Be(1);
+        result.Value.HasPreviousPage.Should().BeFalse();
+        result.Value.HasNextPage.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnRequestedAuditPageWithMetadata()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        Guid userId = Guid.NewGuid();
+        Guid projectId = Guid.NewGuid();
+
+        context.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "Audit Project",
+            StartDate = new DateOnly(2026, 1, 1),
+            EndDate = new DateOnly(2026, 12, 31),
+            CreatedByUserId = userId
+        });
+        context.ProjectMembers.Add(new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            UserId = userId,
+            Role = UserRole.TeamLeader
+        });
+
+        for (int index = 1; index <= 3; index++)
+        {
+            context.AuditLogs.Add(new AuditLog
+            {
+                Id = index,
+                EntityName = "Project",
+                EntityId = projectId.ToString(),
+                Action = "Update",
+                ChangedAt = new DateTimeOffset(2026, 1, index, 0, 0, 0, TimeSpan.Zero)
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        var handler = new GetProjectAuditFeedQueryHandler(context, userContext);
+        var query = new GetProjectAuditFeedQuery(projectId, PageNumber: 2, PageSize: 1);
+
+        // Act
+        Result<AuditFeedResponse> result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Feed.Should().ContainSingle();
+        result.Value.Feed.Single().Id.Should().Be(2);
+        result.Value.PageNumber.Should().Be(2);
+        result.Value.PageSize.Should().Be(1);
+        result.Value.TotalCount.Should().Be(3);
+        result.Value.TotalPages.Should().Be(3);
+        result.Value.HasPreviousPage.Should().BeTrue();
+        result.Value.HasNextPage.Should().BeTrue();
     }
 }

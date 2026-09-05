@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.Projects.GetProjectsByUserId;
 using PMS.Domain.Projects;
@@ -34,7 +35,7 @@ public class GetProjectsByUserIdQueryHandlerTests
         var query = new GetProjectsByUserIdQuery(Guid.NewGuid());
 
         // Act
-        Result<List<ProjectResponse>> result = await handler.Handle(query, CancellationToken.None);
+        Result<PagedResponse<ProjectResponse>> result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -56,7 +57,7 @@ public class GetProjectsByUserIdQueryHandlerTests
         var query = new GetProjectsByUserIdQuery(nonExistentUserId);
 
         // Act
-        Result<List<ProjectResponse>> result = await handler.Handle(query, CancellationToken.None);
+        Result<PagedResponse<ProjectResponse>> result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -88,11 +89,12 @@ public class GetProjectsByUserIdQueryHandlerTests
         var query = new GetProjectsByUserIdQuery(user.Id);
 
         // Act
-        Result<List<ProjectResponse>> result = await handler.Handle(query, CancellationToken.None);
+        Result<PagedResponse<ProjectResponse>> result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeEmpty();
+        result.Value.Items.Should().BeEmpty();
+        result.Value.TotalCount.Should().Be(0);
     }
 
     [Fact]
@@ -152,11 +154,69 @@ public class GetProjectsByUserIdQueryHandlerTests
         var query = new GetProjectsByUserIdQuery(user.Id);
 
         // Act
-        Result<List<ProjectResponse>> result = await handler.Handle(query, CancellationToken.None);
+        Result<PagedResponse<ProjectResponse>> result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(2);
-        result.Value.Select(p => p.Name).Should().Contain(new[] { "Project One", "Project Two" });
+        result.Value.Items.Should().HaveCount(2);
+        result.Value.Items.Select(p => p.Name).Should().Contain(new[] { "Project One", "Project Two" });
+        result.Value.PageNumber.Should().Be(1);
+        result.Value.PageSize.Should().Be(20);
+        result.Value.TotalCount.Should().Be(2);
+        result.Value.TotalPages.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnRequestedPageWithMetadata_WhenPaginationIsSpecified()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "Page",
+            LastName = "Owner",
+            Email = "page.owner@example.com",
+            PasswordHash = "hash"
+        };
+        context.Users.Add(user);
+
+        DateTimeOffset createdAt = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        for (int index = 1; index <= 3; index++)
+        {
+            context.Projects.Add(new Project
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Project {index}",
+                StartDate = new DateOnly(2026, 1, 1),
+                EndDate = new DateOnly(2026, 12, 31),
+                CreatedByUserId = user.Id,
+                CreatedAt = createdAt.AddDays(index)
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(user.Id);
+        var handler = new GetProjectsByUserIdQueryHandler(context, userContext);
+        var query = new GetProjectsByUserIdQuery(user.Id, PageNumber: 2, PageSize: 1);
+
+        // Act
+        Result<PagedResponse<ProjectResponse>> result = await handler.Handle(
+            query,
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle();
+        result.Value.Items.Single().Name.Should().Be("Project 2");
+        result.Value.PageNumber.Should().Be(2);
+        result.Value.PageSize.Should().Be(1);
+        result.Value.TotalCount.Should().Be(3);
+        result.Value.TotalPages.Should().Be(3);
+        result.Value.HasPreviousPage.Should().BeTrue();
+        result.Value.HasNextPage.Should().BeTrue();
     }
 }

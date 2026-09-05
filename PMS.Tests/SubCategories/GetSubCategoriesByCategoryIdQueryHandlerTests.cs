@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
 using PMS.Application.SubCategories.GetSubCategoriesByCategoryId;
 using PMS.Domain.Categories;
@@ -37,7 +38,7 @@ public class GetSubCategoriesByCategoryIdQueryHandlerTests
         var query = new GetSubCategoriesByCategoryIdQuery(Guid.NewGuid());
 
         // Act
-        Result<IReadOnlyCollection<SubCategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
+        Result<PagedResponse<SubCategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -58,7 +59,7 @@ public class GetSubCategoriesByCategoryIdQueryHandlerTests
         var query = new GetSubCategoriesByCategoryIdQuery(nonExistentCategoryId);
 
         // Act
-        Result<IReadOnlyCollection<SubCategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
+        Result<PagedResponse<SubCategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -95,11 +96,57 @@ public class GetSubCategoriesByCategoryIdQueryHandlerTests
         var query = new GetSubCategoriesByCategoryIdQuery(categoryId);
 
         // Act
-        Result<IReadOnlyCollection<SubCategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
+        Result<PagedResponse<SubCategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(2);
-        result.Value.Select(s => s.Name).Should().Contain(new[] { "Sub 1", "Sub 2" });
+        result.Value.Items.Should().HaveCount(2);
+        result.Value.Items.Select(s => s.Name).Should().Contain(new[] { "Sub 1", "Sub 2" });
+        result.Value.TotalCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnRequestedSubCategoryPageInDisplayOrder()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        Guid categoryId = Guid.NewGuid();
+        context.Categories.Add(new Category
+        {
+            Id = categoryId,
+            ProjectId = Guid.NewGuid(),
+            Name = "Paged Parent"
+        });
+        for (int displayOrder = 1; displayOrder <= 3; displayOrder++)
+        {
+            context.SubCategories.Add(new SubCategory
+            {
+                Id = Guid.NewGuid(),
+                CategoryId = categoryId,
+                Name = $"Subcategory {displayOrder}",
+                DisplayOrder = displayOrder
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(Guid.NewGuid());
+        userContext.IsSystemAdmin.Returns(true);
+        var handler = new GetSubCategoriesByCategoryIdQueryHandler(context, userContext);
+        var query = new GetSubCategoriesByCategoryIdQuery(categoryId, PageNumber: 2, PageSize: 1);
+
+        // Act
+        Result<PagedResponse<SubCategoryResponse>> result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle();
+        result.Value.Items.Single().Name.Should().Be("Subcategory 2");
+        result.Value.PageNumber.Should().Be(2);
+        result.Value.PageSize.Should().Be(1);
+        result.Value.TotalCount.Should().Be(3);
+        result.Value.TotalPages.Should().Be(3);
     }
 }

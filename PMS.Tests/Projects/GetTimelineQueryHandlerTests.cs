@@ -172,5 +172,94 @@ public class GetTimelineQueryHandlerTests
         response.Rows[2].Label.Should().Be("Setup Timeline API");
         response.Rows[2].PlannedStartWeekIndex.Should().Be(0);
         response.Rows[2].PlannedEndWeekIndex.Should().Be(1);
+        response.PageNumber.Should().Be(1);
+        response.PageSize.Should().Be(20);
+        response.TotalCount.Should().Be(1);
+        response.TotalPages.Should().Be(1);
+        response.HasPreviousPage.Should().BeFalse();
+        response.HasNextPage.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_Should_PageActionItemsAndRepeatRequiredHeaders_WhenMultiplePagesExist()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        Guid userId = Guid.NewGuid();
+        Guid projectId = Guid.NewGuid();
+        Guid categoryId = Guid.NewGuid();
+        Guid subCategoryId = Guid.NewGuid();
+
+        context.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "Paged Timeline",
+            Description = "Description",
+            StartDate = new DateOnly(2026, 1, 1),
+            EndDate = new DateOnly(2026, 1, 31),
+            WeekStartDay = 1,
+            DefaultTimelineScale = TimelineScale.Weekly,
+            CreatedByUserId = userId
+        });
+        context.ProjectMembers.Add(new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            UserId = userId,
+            Role = UserRole.Member
+        });
+        context.Categories.Add(new Category
+        {
+            Id = categoryId,
+            ProjectId = projectId,
+            Name = "Paged Category",
+            DisplayOrder = 1
+        });
+        context.SubCategories.Add(new SubCategory
+        {
+            Id = subCategoryId,
+            CategoryId = categoryId,
+            Name = "Paged Subcategory",
+            DisplayOrder = 1
+        });
+
+        for (int sequence = 1; sequence <= 3; sequence++)
+        {
+            context.ActionItems.Add(new ActionItem
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                CategoryId = categoryId,
+                SubCategoryId = subCategoryId,
+                ActionItemName = $"Timeline Item {sequence}",
+                Sequence = sequence
+            });
+        }
+
+        await context.SaveChangesAsync();
+
+        IUserContext userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(new DateTime(2026, 1, 10));
+        var handler = new GetTimelineQueryHandler(context, userContext, dateTimeProvider);
+        var query = new GetTimelineQuery(projectId, PageNumber: 2, PageSize: 1);
+
+        // Act
+        Result<TimelineResponse> result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Rows.Should().HaveCount(3);
+        result.Value.Rows.Select(row => row.RowType)
+            .Should().Equal("Category", "SubCategory", "ActionItem");
+        result.Value.Rows[^1].Label.Should().Be("Timeline Item 2");
+        result.Value.PageNumber.Should().Be(2);
+        result.Value.PageSize.Should().Be(1);
+        result.Value.TotalCount.Should().Be(3);
+        result.Value.TotalPages.Should().Be(3);
+        result.Value.HasPreviousPage.Should().BeTrue();
+        result.Value.HasNextPage.Should().BeTrue();
     }
 }

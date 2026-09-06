@@ -1,7 +1,11 @@
 using FluentAssertions;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Messaging;
+using PMS.Domain.ProjectMembers;
 using PMS.Domain.Projects;
+using PMS.Domain.Users;
+using PMS.Infrastructure.Database;
 using PMS.SharedKernel;
 using System.Reflection;
 using Xunit;
@@ -83,5 +87,31 @@ public class ArchitectureTests
             validatorTypes.Should().Contain(commandType,
                 $"Command {commandType.Name} should have a corresponding FluentValidation validator.");
         }
+    }
+
+    [Fact]
+    public void ProjectMember_Should_Have_A_Single_UserRelationship_Using_UserId()
+    {
+        // Arrange
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase($"architecture-{Guid.NewGuid()}")
+            .Options;
+
+        using var context = new ApplicationDbContext(options);
+        var projectMemberType = context.Model.FindEntityType(typeof(ProjectMember));
+
+        // Act
+        var userForeignKeys = projectMemberType!
+            .GetForeignKeys()
+            .Where(foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(User))
+            .ToList();
+
+        // Assert
+        projectMemberType.Should().NotBeNull();
+        projectMemberType.FindProperty(nameof(ProjectMember.UserId)).Should().NotBeNull();
+        projectMemberType.FindProperty("UserId1").Should().BeNull();
+        userForeignKeys.Should().ContainSingle();
+        userForeignKeys[0].Properties.Should().ContainSingle(property => property.Name == nameof(ProjectMember.UserId));
+        userForeignKeys[0].PrincipalToDependent?.Name.Should().Be(nameof(User.ProjectMembers));
     }
 }

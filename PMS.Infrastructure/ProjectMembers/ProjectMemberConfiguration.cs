@@ -49,7 +49,7 @@ internal sealed class ProjectMemberConfiguration : IEntityTypeConfiguration<Proj
 
         // Many ProjectMembers → one User
         builder.HasOne<User>()
-            .WithMany()
+            .WithMany(user => user.ProjectMembers)
             .HasForeignKey(pm => pm.UserId)
             .OnDelete(DeleteBehavior.Restrict);
     }

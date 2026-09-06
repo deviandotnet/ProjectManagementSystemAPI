@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using PMS.API.Configuration;
 using PMS.API.Endpoints;
 using PMS.API.Extensions;
 using PMS.Application.Abstractions;
@@ -31,6 +32,7 @@ internal sealed class ExportProjectExcel : IApiEndpoint
                 CustomResults.Problem);
         })
         .RequireAuthorization()
+        .RequireRateLimiting(SecurityPolicies.Export)
         .WithSummary("Export Project to Excel")
         .WithDescription("Downloads a formatted .xlsx workbook containing the full action items data table and a visual Gantt timeline view with status-colored cells.")
         .WithTags(Tags.Export);

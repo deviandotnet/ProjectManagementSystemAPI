@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using PMS.API.Configuration;
 using PMS.API.Endpoints;
 using PMS.API.Extensions;
 using PMS.Application.Abstractions;
@@ -40,6 +41,7 @@ internal sealed class RegisterUser : IApiEndpoint
                 id => Results.Created($"/api/users/{id}", id),
                 CustomResults.Problem);
         })
+        .RequireRateLimiting(SecurityPolicies.Authentication)
         .WithSummary("Register User")
         .WithDescription("Registers a new user account with first name, last name, unique email, and password.")
         .WithTags(Tags.Users);

@@ -1,3 +1,4 @@
+using PMS.API.Configuration;
 using PMS.API.Endpoints;
 using PMS.API.Extensions;
 using PMS.Application.Abstractions;
@@ -25,6 +26,7 @@ namespace PMS.API.Endpoints.Users
 
                 return result.Match(Results.Ok, CustomResults.Problem);
             })
+            .RequireRateLimiting(SecurityPolicies.Authentication)
             .WithSummary("Login User")
             .WithDescription("Authenticates a registered user with email and password, returning a JWT bearer access token for authorized requests.")
             .WithTags(Tags.Users);

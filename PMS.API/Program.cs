@@ -22,20 +22,12 @@ namespace PMS.API
             builder.Services.Configure<ForwardedHeadersOptions>(options =>
             {
                 options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                options.ForwardLimit = 1;
                 options.KnownIPNetworks.Clear();
                 options.KnownProxies.Clear();
             });
 
-            // CORS Policy 
-            builder.Services.AddCors(options =>
-            {
-                options.AddDefaultPolicy(policy =>
-                {
-                    policy.AllowAnyOrigin()
-                          .AllowAnyHeader()
-                          .AllowAnyMethod();
-                });
-            });
+            builder.Services.AddApiSecurity(builder.Configuration);
 
             // Application (Handlers + Validators)
             builder.Services.AddApplication();
@@ -66,9 +58,13 @@ namespace PMS.API
                 }
             }
 
-            // Middleware Pipeline
+            app.UseHttpsRedirection();
+            app.UseRouting();
             app.UseCors();
             app.UseApiRequestLogging();
+            app.UseAuthentication();
+            app.UseRateLimiter();
+            app.UseAuthorization();
 
             // Health Check Endpoints (/health, /health/live, /health/ready)
             app.MapApiHealthChecks();
@@ -78,11 +74,6 @@ namespace PMS.API
 
             // Scalar UI with auth
             app.UseScalarWithUi();
-
-            app.UseHttpsRedirection();
-
-            app.UseAuthentication();
-            app.UseAuthorization();
 
             app.Run();
         }

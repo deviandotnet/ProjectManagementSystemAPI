@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Categories.GetCategoriesByProjectId;
 using PMS.Domain.Categories;
 using PMS.Domain.ProjectMembers;
@@ -10,6 +11,7 @@ using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.Infrastructure.Database;
 using PMS.SharedKernel;
+using PMS.UnitTests.Caching;
 using Xunit;
 
 namespace PMS.UnitTests.Categories;
@@ -126,5 +128,72 @@ public class GetCategoriesByProjectIdQueryHandlerTests
         result.Value.PageSize.Should().Be(1);
         result.Value.TotalCount.Should().Be(3);
         result.Value.TotalPages.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Handle_Should_CacheWholePage_RequireAuthorizationOnHit_AndRefreshAfterProjectInvalidation()
+    {
+        await using var context = CreateDbContext();
+        Guid userId = Guid.NewGuid();
+        Guid projectId = Guid.NewGuid();
+        context.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "Cached Categories",
+            StartDate = new DateOnly(2026, 1, 1),
+            EndDate = new DateOnly(2026, 12, 31),
+            CreatedByUserId = userId
+        });
+        context.ProjectMembers.Add(new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            UserId = userId,
+            Role = UserRole.Member
+        });
+        context.Categories.AddRange(
+            new Category { Id = Guid.NewGuid(), ProjectId = projectId, Name = "First", DisplayOrder = 1 },
+            new Category { Id = Guid.NewGuid(), ProjectId = projectId, Name = "Second", DisplayOrder = 2 });
+        await context.SaveChangesAsync();
+
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        var cache = new RecordingApplicationCache();
+        var handler = new GetCategoriesByProjectIdQueryHandler(context, userContext, cache);
+        var query = new GetCategoriesByProjectIdQuery(projectId, PageNumber: 1, PageSize: 1);
+
+        Result<PagedResponse<CategoryResponse>> initial = await handler.Handle(query, CancellationToken.None);
+
+        context.Categories.Add(new Category
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            Name = "New First",
+            DisplayOrder = 0
+        });
+        await context.SaveChangesAsync();
+
+        Result<PagedResponse<CategoryResponse>> cached = await handler.Handle(query, CancellationToken.None);
+
+        initial.Value.TotalCount.Should().Be(2);
+        cached.Value.TotalCount.Should().Be(2);
+        cached.Value.Items.Single().Name.Should().Be("First");
+        cache.FactoryCalls.Should().Be(1);
+
+        userContext.IsAuthenticated.Returns(false);
+        Result<PagedResponse<CategoryResponse>> unauthorized = await handler.Handle(query, CancellationToken.None);
+        unauthorized.IsFailure.Should().BeTrue();
+        unauthorized.Error.Should().Be(UserErrors.Unauthorized);
+        cache.FactoryCalls.Should().Be(1);
+
+        userContext.IsAuthenticated.Returns(true);
+        await CacheInvalidation.ProjectAsync(cache, projectId, CancellationToken.None);
+
+        Result<PagedResponse<CategoryResponse>> refreshed = await handler.Handle(query, CancellationToken.None);
+
+        refreshed.Value.TotalCount.Should().Be(3);
+        refreshed.Value.Items.Single().Name.Should().Be("New First");
+        cache.FactoryCalls.Should().Be(2);
     }
 }

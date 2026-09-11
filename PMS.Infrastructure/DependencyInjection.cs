@@ -17,6 +17,7 @@ using PMS.SharedKernel;
 using System.Text;
 using PMS.Application.Abstractions.Export;
 using PMS.Infrastructure.Services.Export;
+using PMS.Infrastructure.Caching;
 
 namespace PMS.Infrastructure
 {
@@ -28,6 +29,7 @@ namespace PMS.Infrastructure
         {
             services.AddHttpContextAccessor();
             services.AddScoped<AuditInterceptor>();
+            services.AddApplicationCaching(configuration);
 
             services.AddDbContext<ApplicationDbContext>((sp, options) =>
             {

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.Categories;
@@ -12,7 +13,8 @@ namespace PMS.Application.Categories.GetCategoriesByProjectId;
 
 internal sealed class GetCategoriesByProjectIdQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetCategoriesByProjectIdQuery, PagedResponse<CategoryResponse>>
 {
     public async Task<Result<PagedResponse<CategoryResponse>>> Handle(
@@ -49,9 +51,28 @@ internal sealed class GetCategoriesByProjectIdQueryHandler(
         int pageSize = Math.Clamp(query.PageSize, 1, 100);
         int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
 
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("project-categories", query.ProjectId, pageNumber, pageSize);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(query.ProjectId, pageNumber, pageSize, skip, token),
+            CachePolicy.Collection,
+            [CacheTags.Project(query.ProjectId), CacheTags.ProjectCategories(query.ProjectId)],
+            cancellationToken);
+    }
+
+    private async ValueTask<PagedResponse<CategoryResponse>> LoadPageAsync(
+        Guid projectId,
+        int pageNumber,
+        int pageSize,
+        int skip,
+        CancellationToken cancellationToken)
+    {
+
         var categoriesQuery = context.Categories
             .AsNoTracking()
-            .Where(c => c.ProjectId == query.ProjectId);
+            .Where(c => c.ProjectId == projectId);
 
         int totalCount = await categoriesQuery.CountAsync(cancellationToken);
 

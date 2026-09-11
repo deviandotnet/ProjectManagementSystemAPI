@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
@@ -12,7 +13,8 @@ namespace PMS.Application.Projects.GetTimeline;
 internal sealed class GetTimelineQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetTimelineQuery, TimelineResponse>
 {
     public async Task<Result<TimelineResponse>> Handle(
@@ -56,6 +58,44 @@ internal sealed class GetTimelineQueryHandler(
             endDate = startDate.AddDays(30);
         }
 
+        int pageNumber = CacheKeyBuilder.NormalizePageNumber(query.PageNumber);
+        int pageSize = CacheKeyBuilder.NormalizePageSize(query.PageSize);
+        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create(
+            "timeline",
+            query.ProjectId,
+            scale,
+            startDate,
+            endDate,
+            pageNumber,
+            pageSize,
+            today);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(project, scale, startDate, endDate, pageNumber, pageSize, today, token),
+            CachePolicy.Computed,
+            [
+                CacheTags.Project(query.ProjectId),
+                CacheTags.ProjectCategories(query.ProjectId),
+                CacheTags.ProjectActionItems(query.ProjectId),
+                CacheTags.ProjectTimeline(query.ProjectId)
+            ],
+            cancellationToken);
+    }
+
+    private async ValueTask<TimelineResponse> LoadPageAsync(
+        Project project,
+        TimelineScale scale,
+        DateOnly startDate,
+        DateOnly endDate,
+        int pageNumber,
+        int pageSize,
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
+
         List<TimelineColumnResponse> columns = GenerateColumns(
             scale,
             startDate,
@@ -71,11 +111,9 @@ internal sealed class GetTimelineQueryHandler(
             from ps in psGroup.DefaultIfEmpty()
             join ae in context.ActualExecutions.AsNoTracking() on ai.Id equals ae.ActionItemId into aeGroup
             from ae in aeGroup.DefaultIfEmpty()
-            where ai.ProjectId == query.ProjectId
+            where ai.ProjectId == project.Id
             select new { ai, c, sc, ps, ae };
 
-        int pageNumber = Math.Max(query.PageNumber, 1);
-        int pageSize = Math.Clamp(query.PageSize, 1, 100);
         int itemsToSkip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
         int totalCount = await actionItemsQuery.CountAsync(cancellationToken);
         int totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
@@ -104,7 +142,6 @@ internal sealed class GetTimelineQueryHandler(
                 x.ae == null ? null : x.ae.ActualEndDate))
             .ToListAsync(cancellationToken);
 
-        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
         List<TimelineRowResponse> rows = BuildRows(actionItems, columns, today);
         DayOfWeek weekStart = (DayOfWeek)(project.WeekStartDay % 7);
 

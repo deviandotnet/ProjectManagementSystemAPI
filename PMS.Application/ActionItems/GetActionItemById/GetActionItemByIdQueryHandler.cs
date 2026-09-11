@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
@@ -12,7 +13,8 @@ namespace PMS.Application.ActionItems.GetActionItemById;
 internal sealed class GetActionItemByIdQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetActionItemByIdQuery, ActionItemResponse>
 {
     public async Task<Result<ActionItemResponse>> Handle(
@@ -48,7 +50,45 @@ internal sealed class GetActionItemByIdQueryHandler(
             }
         }
 
-        // ── 4. Fetch only fields required by the response ─────────────────
+        bool actionItemExists = await context.ActionItems.AnyAsync(
+            ai => ai.Id == query.ActionItemId && ai.ProjectId == query.ProjectId,
+            cancellationToken);
+
+        if (!actionItemExists)
+        {
+            return Result.Failure<ActionItemResponse>(ActionItemErrors.NotFound(query.ActionItemId));
+        }
+
+        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create(
+            "action-item",
+            query.ProjectId,
+            query.ActionItemId,
+            today);
+
+        ActionItemResponse? response = await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadAsync(query, today, token),
+            CachePolicy.Computed,
+            [
+                CacheTags.Project(query.ProjectId),
+                CacheTags.ProjectActionItems(query.ProjectId),
+                CacheTags.ActionItem(query.ActionItemId)
+            ],
+            cancellationToken);
+
+        return response is null
+            ? Result.Failure<ActionItemResponse>(ActionItemErrors.NotFound(query.ActionItemId))
+            : response;
+    }
+
+    private async ValueTask<ActionItemResponse?> LoadAsync(
+        GetActionItemByIdQuery query,
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
+        // Fetch only fields required by the response.
         ActionItemReadModel? rawItem = await (
             from ai in context.ActionItems.AsNoTracking()
             join c in context.Categories.AsNoTracking() on ai.CategoryId equals c.Id
@@ -87,11 +127,9 @@ internal sealed class GetActionItemByIdQueryHandler(
 
         if (rawItem is null)
         {
-            return Result.Failure<ActionItemResponse>(ActionItemErrors.NotFound(query.ActionItemId));
+            return null;
         }
 
-        // ── 5. Dynamic Status Engine Computation ───────────────────────────
-        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
         ActionItemStatus status = ActionItemStatusService.ComputeStatus(
             rawItem.PlannedEndDate,
             rawItem.ActualStartDate,

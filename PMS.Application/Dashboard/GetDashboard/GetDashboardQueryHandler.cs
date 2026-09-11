@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
@@ -13,7 +14,8 @@ namespace PMS.Application.Dashboard.GetDashboard;
 internal sealed class GetDashboardQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetDashboardQuery, DashboardResponse>
 {
     public async Task<Result<DashboardResponse>> Handle(
@@ -27,8 +29,28 @@ internal sealed class GetDashboardQueryHandler(
 
         Guid userId = userContext.UserId.Value;
         bool isSystemAdmin = userContext.IsSystemAdmin;
-        int pageNumber = Math.Max(query.PageNumber, 1);
-        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int pageNumber = CacheKeyBuilder.NormalizePageNumber(query.PageNumber);
+        int pageSize = CacheKeyBuilder.NormalizePageSize(query.PageSize);
+        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("dashboard", userId, isSystemAdmin, pageNumber, pageSize, today);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(userId, isSystemAdmin, pageNumber, pageSize, today, token),
+            CachePolicy.Computed,
+            [CacheTags.UserDashboard(userId), CacheTags.AllDashboards],
+            cancellationToken);
+    }
+
+    private async ValueTask<DashboardResponse> LoadPageAsync(
+        Guid userId,
+        bool isSystemAdmin,
+        int pageNumber,
+        int pageSize,
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
         int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
 
         var projectsQuery = context.Projects
@@ -86,7 +108,6 @@ internal sealed class GetDashboardQueryHandler(
             .GroupBy(ai => ai.ProjectId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
         var projectSummaries = new List<DashboardProjectSummaryResponse>(projects.Count);
 
         foreach (ProjectDashboardReadModel project in projects)

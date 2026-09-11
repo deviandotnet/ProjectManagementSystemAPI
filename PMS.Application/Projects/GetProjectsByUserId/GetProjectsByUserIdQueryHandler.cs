@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ProjectMembers;
@@ -12,7 +13,8 @@ namespace PMS.Application.Projects.GetProjectsByUserId;
 
 internal sealed class GetProjectsByUserIdQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetProjectsByUserIdQuery, PagedResponse<ProjectResponse>>
 {
     public async Task<Result<PagedResponse<ProjectResponse>>> Handle(
@@ -41,10 +43,29 @@ internal sealed class GetProjectsByUserIdQueryHandler(
         int pageSize = Math.Clamp(query.PageSize, 1, 100);
         int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
 
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("user-projects", query.UserId, pageNumber, pageSize);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(query.UserId, pageNumber, pageSize, skip, token),
+            CachePolicy.Collection,
+            [CacheTags.UserProjects(query.UserId), CacheTags.AllProjectLists],
+            cancellationToken);
+    }
+
+    private async ValueTask<PagedResponse<ProjectResponse>> LoadPageAsync(
+        Guid userId,
+        int pageNumber,
+        int pageSize,
+        int skip,
+        CancellationToken cancellationToken)
+    {
+
         var projectsQuery = context.Projects
             .AsNoTracking()
-            .Where(p => p.CreatedByUserId == query.UserId ||
-                        context.ProjectMembers.Any(pm => pm.ProjectId == p.Id && pm.UserId == query.UserId));
+            .Where(p => p.CreatedByUserId == userId ||
+                        context.ProjectMembers.Any(pm => pm.ProjectId == p.Id && pm.UserId == userId));
 
         int totalCount = await projectsQuery.CountAsync(cancellationToken);
 

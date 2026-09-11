@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.HolidayCalendars;
@@ -11,7 +12,8 @@ namespace PMS.Application.Holidays.DeleteHoliday;
 internal sealed class DeleteHolidayCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : ICommandHandler<DeleteHolidayCommand>
 {
     public async Task<Result> Handle(
@@ -40,6 +42,7 @@ internal sealed class DeleteHolidayCommandHandler(
 
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
+        await CacheInvalidation.HolidaysAsync(cache, cancellationToken);
 
         return Result.Success();
     }

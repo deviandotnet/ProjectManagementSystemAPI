@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ProjectMembers;
@@ -12,7 +13,8 @@ namespace PMS.Application.ProjectMembers.GetProjectMembers;
 
 internal sealed class GetProjectMembersQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetProjectMembersQuery, PagedResponse<ProjectMemberResponse>>
 {
     public async Task<Result<PagedResponse<ProjectMemberResponse>>> Handle(
@@ -47,10 +49,29 @@ internal sealed class GetProjectMembersQueryHandler(
         int pageSize = Math.Clamp(query.PageSize, 1, 100);
         int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
 
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("project-members", query.ProjectId, pageNumber, pageSize);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(query.ProjectId, pageNumber, pageSize, skip, token),
+            CachePolicy.Collection,
+            [CacheTags.Project(query.ProjectId), CacheTags.ProjectMembers(query.ProjectId)],
+            cancellationToken);
+    }
+
+    private async ValueTask<PagedResponse<ProjectMemberResponse>> LoadPageAsync(
+        Guid projectId,
+        int pageNumber,
+        int pageSize,
+        int skip,
+        CancellationToken cancellationToken)
+    {
+
         var membersQuery =
             from pm in context.ProjectMembers.AsNoTracking()
             join u in context.Users.AsNoTracking() on pm.UserId equals u.Id
-            where pm.ProjectId == query.ProjectId
+            where pm.ProjectId == projectId
             select new { pm, u };
 
         int totalCount = await membersQuery.CountAsync(cancellationToken);

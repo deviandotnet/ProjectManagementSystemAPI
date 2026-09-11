@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ProjectMembers;
@@ -13,7 +14,8 @@ internal sealed class CreateProjectCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : ICommandHandler<CreateProjectCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(
@@ -61,6 +63,7 @@ internal sealed class CreateProjectCommandHandler(
         await context.ProjectMembers.AddAsync(projectMember, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
+        await CacheInvalidation.ProjectCreatedAsync(cache, userContext.UserId.Value, cancellationToken);
 
         return project.Id;
     }

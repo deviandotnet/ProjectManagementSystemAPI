@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.Categories;
@@ -13,7 +14,8 @@ namespace PMS.Application.SubCategories.DeleteSubCategory;
 internal sealed class DeleteSubCategoryCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : ICommandHandler<DeleteSubCategoryCommand>
 {
     public async Task<Result> Handle(
@@ -75,6 +77,7 @@ internal sealed class DeleteSubCategoryCommandHandler(
 
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
+        await CacheInvalidation.ProjectAsync(cache, category.ProjectId, cancellationToken);
 
         return Result.Success();
     }

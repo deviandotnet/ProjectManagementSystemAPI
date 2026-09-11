@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ProjectMembers;
@@ -13,7 +14,8 @@ internal sealed class AddProjectMemberCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : ICommandHandler<AddProjectMemberCommand>
 {
     public async Task<Result> Handle(
@@ -80,6 +82,7 @@ internal sealed class AddProjectMemberCommandHandler(
         await context.ProjectMembers.AddAsync(member, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
+        await CacheInvalidation.MembershipAsync(cache, command.ProjectId, command.UserId, cancellationToken);
 
         return Result.Success();
     }

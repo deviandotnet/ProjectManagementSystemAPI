@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.HolidayCalendars;
@@ -11,7 +12,8 @@ namespace PMS.Application.Calendar.CalculateWorkingDays;
 
 internal sealed class CalculateWorkingDaysQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<CalculateWorkingDaysQuery, WorkingDaysResponse>
 {
     public async Task<Result<WorkingDaysResponse>> Handle(
@@ -50,6 +52,26 @@ internal sealed class CalculateWorkingDaysQueryHandler(
         {
             return Result.Failure<WorkingDaysResponse>(HolidayErrors.InvalidDateRange);
         }
+
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create(
+            "working-days",
+            query.ProjectId,
+            query.StartDate,
+            query.EndDate);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => CalculateAsync(query, token),
+            CachePolicy.Reference,
+            [CacheTags.Project(query.ProjectId), CacheTags.Holidays, CacheTags.WorkingDays],
+            cancellationToken);
+    }
+
+    private async ValueTask<WorkingDaysResponse> CalculateAsync(
+        CalculateWorkingDaysQuery query,
+        CancellationToken cancellationToken)
+    {
 
         List<HolidayCalendar> holidays = await context.HolidayCalendar
             .AsNoTracking()

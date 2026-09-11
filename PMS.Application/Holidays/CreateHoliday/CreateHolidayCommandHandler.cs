@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.HolidayCalendars;
@@ -12,7 +13,8 @@ internal sealed class CreateHolidayCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : ICommandHandler<CreateHolidayCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(
@@ -54,6 +56,7 @@ internal sealed class CreateHolidayCommandHandler(
 
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
+        await CacheInvalidation.HolidaysAsync(cache, cancellationToken);
 
         return holiday.Id;
     }

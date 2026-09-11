@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.Projects;
@@ -10,7 +11,8 @@ namespace PMS.Application.Projects.GetProjectAuditFeed;
 
 internal sealed class GetProjectAuditFeedQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetProjectAuditFeedQuery, AuditFeedResponse>
 {
     public async Task<Result<AuditFeedResponse>> Handle(
@@ -56,16 +58,39 @@ internal sealed class GetProjectAuditFeedQueryHandler(
             }
         }
 
-        // ── 4. Collect Associated Project Entity IDs & Titles ───────────────
+        int pageNumber = Math.Max(query.PageNumber, 1);
+        int pageSize = Math.Clamp(query.PageSize, 1, 100);
+        int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
+
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("project-audit", query.ProjectId, pageNumber, pageSize);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(project.Id, project.Name, pageNumber, pageSize, skip, token),
+            CachePolicy.Audit,
+            [CacheTags.Project(query.ProjectId), CacheTags.ProjectAudit(query.ProjectId)],
+            cancellationToken);
+    }
+
+    private async ValueTask<AuditFeedResponse> LoadPageAsync(
+        Guid projectId,
+        string projectName,
+        int pageNumber,
+        int pageSize,
+        int skip,
+        CancellationToken cancellationToken)
+    {
+        // Collect associated project entity IDs and titles.
         var entityTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            [project.Id.ToString()] = project.Name
+            [projectId.ToString()] = projectName
         };
 
         // Categories
         var categories = await context.Categories
             .AsNoTracking()
-            .Where(c => c.ProjectId == query.ProjectId)
+            .Where(c => c.ProjectId == projectId)
             .Select(c => new { c.Id, c.Name })
             .ToListAsync(cancellationToken);
 
@@ -91,7 +116,7 @@ internal sealed class GetProjectAuditFeedQueryHandler(
         // Action Items with PlannedSchedules and ActualExecutions
         var actionItems = await (
             from ai in context.ActionItems.AsNoTracking()
-            where ai.ProjectId == query.ProjectId
+            where ai.ProjectId == projectId
             join ps in context.PlannedSchedules.AsNoTracking() on ai.Id equals ps.ActionItemId into psGroup
             from ps in psGroup.DefaultIfEmpty()
             join ae in context.ActualExecutions.AsNoTracking() on ai.Id equals ae.ActionItemId into aeGroup
@@ -123,7 +148,7 @@ internal sealed class GetProjectAuditFeedQueryHandler(
         // Project Members
         var members = await (
             from pm in context.ProjectMembers.AsNoTracking()
-            where pm.ProjectId == query.ProjectId
+            where pm.ProjectId == projectId
             join u in context.Users.AsNoTracking() on pm.UserId equals u.Id
             select new
             {
@@ -140,10 +165,6 @@ internal sealed class GetProjectAuditFeedQueryHandler(
         var allEntityIds = entityTitles.Keys.ToList();
 
         // ── 5. Query Audit Logs ─────────────────────────────────────────────
-        int pageNumber = Math.Max(query.PageNumber, 1);
-        int pageSize = Math.Clamp(query.PageSize, 1, 100);
-        int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
-
         var auditLogsQuery = context.AuditLogs
             .AsNoTracking()
             .Where(al => allEntityIds.Contains(al.EntityId));
@@ -186,8 +207,8 @@ internal sealed class GetProjectAuditFeedQueryHandler(
         int totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
         return new AuditFeedResponse(
-            project.Id,
-            project.Name,
+            projectId,
+            projectName,
             feedItems,
             pageNumber,
             pageSize,

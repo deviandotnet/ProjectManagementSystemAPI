@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ProjectMembers;
@@ -12,7 +13,8 @@ namespace PMS.Application.ProjectMembers.UpdateProjectMemberRole;
 internal sealed class UpdateProjectMemberRoleCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : ICommandHandler<UpdateProjectMemberRoleCommand>
 {
     public async Task<Result> Handle(
@@ -63,6 +65,7 @@ internal sealed class UpdateProjectMemberRoleCommandHandler(
 
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
+        await CacheInvalidation.MembershipAsync(cache, command.ProjectId, command.UserId, cancellationToken);
 
         return Result.Success();
     }

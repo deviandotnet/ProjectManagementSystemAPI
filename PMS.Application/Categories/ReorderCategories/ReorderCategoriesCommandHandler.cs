@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.Categories;
@@ -14,7 +15,8 @@ internal sealed class ReorderCategoriesCommandHandler(
     IApplicationDbContext context,
     IUnitOfWork unitOfWork,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : ICommandHandler<ReorderCategoriesCommand>
 {
     public async Task<Result> Handle(
@@ -73,6 +75,7 @@ internal sealed class ReorderCategoriesCommandHandler(
 
         await context.SaveChangesAsync(cancellationToken);
         await unitOfWork.CommitAsync(cancellationToken);
+        await CacheInvalidation.ProjectAsync(cache, command.ProjectId, cancellationToken);
 
         return Result.Success();
     }

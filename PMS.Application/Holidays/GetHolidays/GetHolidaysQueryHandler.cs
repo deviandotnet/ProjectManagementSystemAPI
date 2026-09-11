@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.HolidayCalendars;
@@ -10,7 +11,8 @@ namespace PMS.Application.Holidays.GetHolidays;
 
 internal sealed class GetHolidaysQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetHolidaysQuery, IReadOnlyCollection<HolidayResponse>>
 {
     public async Task<Result<IReadOnlyCollection<HolidayResponse>>> Handle(
@@ -22,6 +24,23 @@ internal sealed class GetHolidaysQueryHandler(
             return Result.Failure<IReadOnlyCollection<HolidayResponse>>(UserErrors.Unauthorized);
         }
 
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("holidays", query.Year, query.Type);
+
+        IReadOnlyCollection<HolidayResponse> holidays = await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadAsync(query, token),
+            CachePolicy.Reference,
+            [CacheTags.Holidays],
+            cancellationToken);
+
+        return Result.Success(holidays);
+    }
+
+    private async ValueTask<IReadOnlyCollection<HolidayResponse>> LoadAsync(
+        GetHolidaysQuery query,
+        CancellationToken cancellationToken)
+    {
         var dbQuery = context.HolidayCalendar.AsNoTracking();
 
         if (query.Type.HasValue)

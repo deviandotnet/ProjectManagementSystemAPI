@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.Categories;
@@ -12,7 +13,8 @@ namespace PMS.Application.SubCategories.GetSubCategoriesByCategoryId;
 
 internal sealed class GetSubCategoriesByCategoryIdQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetSubCategoriesByCategoryIdQuery, PagedResponse<SubCategoryResponse>>
 {
     public async Task<Result<PagedResponse<SubCategoryResponse>>> Handle(
@@ -50,9 +52,28 @@ internal sealed class GetSubCategoriesByCategoryIdQueryHandler(
         int pageSize = Math.Clamp(query.PageSize, 1, 100);
         int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
 
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("category-subcategories", query.CategoryId, pageNumber, pageSize);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(query.CategoryId, pageNumber, pageSize, skip, token),
+            CachePolicy.Collection,
+            [CacheTags.Project(category.ProjectId), CacheTags.CategorySubCategories(query.CategoryId)],
+            cancellationToken);
+    }
+
+    private async ValueTask<PagedResponse<SubCategoryResponse>> LoadPageAsync(
+        Guid categoryId,
+        int pageNumber,
+        int pageSize,
+        int skip,
+        CancellationToken cancellationToken)
+    {
+
         var subCategoriesQuery = context.SubCategories
             .AsNoTracking()
-            .Where(sc => sc.CategoryId == query.CategoryId);
+            .Where(sc => sc.CategoryId == categoryId);
 
         int totalCount = await subCategoriesQuery.CountAsync(cancellationToken);
 

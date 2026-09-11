@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
@@ -13,7 +14,8 @@ namespace PMS.Application.ActionItems.GetActionItemHistory;
 
 internal sealed class GetActionItemHistoryQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetActionItemHistoryQuery, PagedResponse<ActionItemHistoryResponse>>
 {
     public async Task<Result<PagedResponse<ActionItemHistoryResponse>>> Handle(
@@ -62,11 +64,39 @@ internal sealed class GetActionItemHistoryQueryHandler(
         }
 
         // ── 5. Query Audit History ─────────────────────────────────────────
-        string actionItemIdString = query.ActionItemId.ToString();
-
         int pageNumber = Math.Max(query.PageNumber, 1);
         int pageSize = Math.Clamp(query.PageSize, 1, 100);
         int skip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
+
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create(
+            "action-item-history",
+            query.ProjectId,
+            query.ActionItemId,
+            pageNumber,
+            pageSize);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(query.ActionItemId, itemTitle, pageNumber, pageSize, skip, token),
+            CachePolicy.Audit,
+            [
+                CacheTags.Project(query.ProjectId),
+                CacheTags.ProjectAudit(query.ProjectId),
+                CacheTags.ActionItemHistory(query.ActionItemId)
+            ],
+            cancellationToken);
+    }
+
+    private async ValueTask<PagedResponse<ActionItemHistoryResponse>> LoadPageAsync(
+        Guid actionItemId,
+        string itemTitle,
+        int pageNumber,
+        int pageSize,
+        int skip,
+        CancellationToken cancellationToken)
+    {
+        string actionItemIdString = actionItemId.ToString();
 
         var auditLogsQuery = context.AuditLogs
             .AsNoTracking()

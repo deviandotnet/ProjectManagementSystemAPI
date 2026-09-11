@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ProjectMembers;
@@ -11,7 +12,8 @@ namespace PMS.Application.Projects.GetProjectById;
 
 internal sealed class GetProjectByIdQueryHandler(
     IApplicationDbContext context,
-    IUserContext userContext)
+    IUserContext userContext,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetProjectByIdQuery, ProjectResponse>
 {
     public async Task<Result<ProjectResponse>> Handle(
@@ -23,23 +25,10 @@ internal sealed class GetProjectByIdQueryHandler(
             return Result.Failure<ProjectResponse>(UserErrors.Unauthorized);
         }
 
-        ProjectResponse? project = await context.Projects
-            .AsNoTracking()
-            .Where(p => p.Id == query.Id)
-            .Select(p => new ProjectResponse(
-                p.Id,
-                p.Name,
-                p.Description,
-                p.StartDate,
-                p.EndDate,
-                p.WeekStartDay,
-                p.DefaultTimelineScale,
-                p.ProgressMode,
-                p.Status,
-                p.CreatedByUserId))
-            .SingleOrDefaultAsync(cancellationToken);
+        bool projectExists = await context.Projects
+            .AnyAsync(p => p.Id == query.Id, cancellationToken);
 
-        if (project is null)
+        if (!projectExists)
         {
             return Result.Failure<ProjectResponse>(ProjectErrors.NotFound(query.Id));
         }
@@ -55,6 +44,32 @@ internal sealed class GetProjectByIdQueryHandler(
             }
         }
 
-        return project;
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("project-details", query.Id);
+
+        ProjectResponse? project = await applicationCache.GetOrCreateAsync(
+            key,
+            async token => await context.Projects
+                .AsNoTracking()
+                .Where(p => p.Id == query.Id)
+                .Select(p => new ProjectResponse(
+                    p.Id,
+                    p.Name,
+                    p.Description,
+                    p.StartDate,
+                    p.EndDate,
+                    p.WeekStartDay,
+                    p.DefaultTimelineScale,
+                    p.ProgressMode,
+                    p.Status,
+                    p.CreatedByUserId))
+                .SingleOrDefaultAsync(token),
+            CachePolicy.Entity,
+            [CacheTags.Project(query.Id), CacheTags.ProjectDetails(query.Id)],
+            cancellationToken);
+
+        return project is null
+            ? Result.Failure<ProjectResponse>(ProjectErrors.NotFound(query.Id))
+            : project;
     }
 }

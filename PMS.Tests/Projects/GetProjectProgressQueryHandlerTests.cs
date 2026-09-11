@@ -11,6 +11,7 @@ using PMS.Domain.Projects;
 using PMS.Domain.Users;
 using PMS.Infrastructure.Database;
 using PMS.SharedKernel;
+using PMS.UnitTests.Caching;
 using Xunit;
 
 namespace PMS.UnitTests.Projects;
@@ -203,5 +204,69 @@ public class GetProjectProgressQueryHandlerTests
         result.Value.TotalWeight.Should().Be(100.0);
         result.Value.CompletedWeight.Should().Be(30.0);
         result.Value.ProgressPercent.Should().Be(30.0); // 30 / 100 * 100
+    }
+
+    [Fact]
+    public async Task Handle_Should_UseANewCacheEntry_WhenEffectiveDateRollsOver()
+    {
+        await using var context = CreateDbContext();
+        Guid userId = Guid.NewGuid();
+        Guid projectId = Guid.NewGuid();
+        Guid actionItemId = Guid.NewGuid();
+
+        context.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "Date-sensitive project",
+            ProgressMode = ProgressMode.CountBased,
+            StartDate = new DateOnly(2026, 1, 1),
+            EndDate = new DateOnly(2026, 12, 31),
+            CreatedByUserId = userId
+        });
+        context.ProjectMembers.Add(new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            UserId = userId,
+            Role = UserRole.Member
+        });
+        context.ActionItems.Add(new ActionItem
+        {
+            Id = actionItemId,
+            ProjectId = projectId,
+            CategoryId = Guid.NewGuid(),
+            ActionItemName = "Rollover item",
+            Sequence = 1
+        });
+        context.PlannedSchedules.Add(new PlannedSchedule
+        {
+            Id = Guid.NewGuid(),
+            ActionItemId = actionItemId,
+            PlannedStartDate = new DateOnly(2026, 1, 1),
+            PlannedEndDate = new DateOnly(2026, 1, 1)
+        });
+        await context.SaveChangesAsync();
+
+        IUserContext userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(
+            new DateTime(2026, 1, 1),
+            new DateTime(2026, 1, 2));
+        var cache = new RecordingApplicationCache();
+        var handler = new GetProjectProgressQueryHandler(context, userContext, dateTimeProvider, cache);
+        var query = new GetProjectProgressQuery(projectId);
+
+        Result<ProjectProgressResponse> beforeRollover =
+            await handler.Handle(query, CancellationToken.None);
+        Result<ProjectProgressResponse> afterRollover =
+            await handler.Handle(query, CancellationToken.None);
+
+        beforeRollover.Value.PlannedActionItems.Should().Be(1);
+        beforeRollover.Value.DelayedActionItems.Should().Be(0);
+        afterRollover.Value.PlannedActionItems.Should().Be(0);
+        afterRollover.Value.DelayedActionItems.Should().Be(1);
+        cache.FactoryCalls.Should().Be(2);
     }
 }

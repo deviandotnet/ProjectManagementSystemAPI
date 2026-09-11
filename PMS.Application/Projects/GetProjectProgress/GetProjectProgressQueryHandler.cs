@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
@@ -12,7 +13,8 @@ namespace PMS.Application.Projects.GetProjectProgress;
 internal sealed class GetProjectProgressQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetProjectProgressQuery, ProjectProgressResponse>
 {
     public async Task<Result<ProjectProgressResponse>> Handle(
@@ -49,10 +51,27 @@ internal sealed class GetProjectProgressQueryHandler(
             }
         }
 
-        // 4. Load Action Items with PlannedSchedules and ActualExecutions
+        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create("project-progress", query.ProjectId, today);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => CalculateAsync(project, today, token),
+            CachePolicy.Computed,
+            [CacheTags.Project(query.ProjectId), CacheTags.ProjectActionItems(query.ProjectId), CacheTags.ProjectProgress(query.ProjectId)],
+            cancellationToken);
+    }
+
+    private async ValueTask<ProjectProgressResponse> CalculateAsync(
+        Project project,
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
+        // Load Action Items with PlannedSchedules and ActualExecutions.
         var actionItemsData = await (
             from ai in context.ActionItems.AsNoTracking()
-            where ai.ProjectId == query.ProjectId
+            where ai.ProjectId == project.Id
             join ps in context.PlannedSchedules.AsNoTracking() on ai.Id equals ps.ActionItemId into psGroup
             from ps in psGroup.DefaultIfEmpty()
             join ae in context.ActualExecutions.AsNoTracking() on ai.Id equals ae.ActionItemId into aeGroup
@@ -67,9 +86,7 @@ internal sealed class GetProjectProgressQueryHandler(
             }
         ).ToListAsync(cancellationToken);
 
-        // 5. Compute Statuses and KPI Metrics
-        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
-
+        // Compute Statuses and KPI Metrics.
         int totalItems = actionItemsData.Count;
         int completedCount = 0;
         int ongoingCount = 0;

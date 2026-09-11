@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Abstractions.Caching;
 using PMS.Application.Abstractions.Data;
 using PMS.Application.Abstractions.Messaging;
 using PMS.Domain.ActionItems;
@@ -13,7 +14,8 @@ namespace PMS.Application.ActionItems.GetActionItems;
 internal sealed class GetActionItemsQueryHandler(
     IApplicationDbContext context,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    IApplicationCache? cache = null)
     : IQueryHandler<GetActionItemsQuery, PagedResponse<ActionItemResponse>>
 {
     public async Task<Result<PagedResponse<ActionItemResponse>>> Handle(
@@ -45,6 +47,46 @@ internal sealed class GetActionItemsQueryHandler(
                 return Result.Failure<PagedResponse<ActionItemResponse>>(ActionItemErrors.NotProjectMember);
             }
         }
+
+        int pageNumber = CacheKeyBuilder.NormalizePageNumber(query.PageNumber);
+        int pageSize = CacheKeyBuilder.NormalizePageSize(query.PageSize);
+        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
+        string filterFingerprint = CacheKeyBuilder.Fingerprint(
+            query.CategoryId,
+            query.SubCategoryId,
+            query.Statuses ?? [],
+            query.Priority,
+            query.OwnerName,
+            query.Search,
+            query.WeekStart,
+            query.WeekEnd,
+            query.StartDate,
+            query.EndDate);
+
+        IApplicationCache applicationCache = cache ?? NullApplicationCache.Instance;
+        string key = CacheKeyBuilder.Create(
+            "action-items",
+            query.ProjectId,
+            pageNumber,
+            pageSize,
+            today,
+            filterFingerprint);
+
+        return await applicationCache.GetOrCreateAsync(
+            key,
+            token => LoadPageAsync(query, today, pageNumber, pageSize, token),
+            CachePolicy.Computed,
+            [CacheTags.Project(query.ProjectId), CacheTags.ProjectActionItems(query.ProjectId)],
+            cancellationToken);
+    }
+
+    private async ValueTask<PagedResponse<ActionItemResponse>> LoadPageAsync(
+        GetActionItemsQuery query,
+        DateOnly today,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
 
         var dbQuery = from ai in context.ActionItems.AsNoTracking()
                       join c in context.Categories.AsNoTracking() on ai.CategoryId equals c.Id
@@ -111,8 +153,6 @@ internal sealed class GetActionItemsQueryHandler(
                                          string.Compare(x.ps.PlannedEndWeek, weekEnd) <= 0);
         }
 
-        DateOnly today = DateOnly.FromDateTime(dateTimeProvider.UtcNow);
-
         if (query.Statuses is { Length: > 0 })
         {
             bool includePlan = query.Statuses.Contains((int)ActionItemStatus.Plan);
@@ -140,8 +180,6 @@ internal sealed class GetActionItemsQueryHandler(
                     x.ae.ActualEndDate.HasValue && x.ae.ActualEndDate > x.ps.PlannedEndDate));
         }
 
-        int pageNumber = Math.Max(query.PageNumber, 1);
-        int pageSize = Math.Clamp(query.PageSize, 1, 100);
         int itemsToSkip = (int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue);
         int totalCount = await dbQuery.CountAsync(cancellationToken);
 

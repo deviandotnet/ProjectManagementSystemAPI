@@ -79,6 +79,78 @@ public sealed class GetCategoriesWithActionItemsQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnEveryCategoryWithEmptyActionItems_WhenProjectHasNoActionItems()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        Guid userId = Guid.NewGuid();
+        Guid projectId = Guid.NewGuid();
+        context.Projects.Add(new Project
+        {
+            Id = projectId,
+            Name = "Empty Plan",
+            StartDate = new DateOnly(2026, 8, 1),
+            EndDate = new DateOnly(2026, 10, 20),
+            CreatedByUserId = userId
+        });
+        context.ProjectMembers.Add(new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            UserId = userId,
+            Role = UserRole.Member
+        });
+        context.Categories.AddRange(
+            new Category
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                Name = "Third",
+                DisplayOrder = 3
+            },
+            new Category
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                Name = "First",
+                DisplayOrder = 1
+            },
+            new Category
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                Name = "Second",
+                DisplayOrder = 2
+            });
+        await context.SaveChangesAsync();
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(new DateTime(2026, 8, 20));
+        var handler = new GetCategoriesWithActionItemsQueryHandler(
+            context,
+            userContext,
+            dateTimeProvider);
+
+        // Act
+        Result<CategoriesWithActionItemsResponse> result = await handler.Handle(
+            new GetCategoriesWithActionItemsQuery(projectId),
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Categories.Select(category => category.Name)
+            .Should().Equal("First", "Second", "Third");
+        result.Value.Categories.Should().OnlyContain(
+            category => category.ActionItems.Count == 0);
+        result.Value.TotalCount.Should().Be(0);
+        result.Value.TotalPages.Should().Be(0);
+        result.Value.HasPreviousPage.Should().BeFalse();
+        result.Value.HasNextPage.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Handle_Should_GroupFilteredActionItemsByCategory_WithLeafPagination()
     {
         // Arrange
@@ -108,8 +180,9 @@ public sealed class GetCategoriesWithActionItemsQueryHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Categories.Should().ContainSingle();
-        CategoryWithActionItemsResponse category = result.Value.Categories.Single();
+        result.Value.Categories.Should().HaveCount(3);
+        CategoryWithActionItemsResponse category = result.Value.Categories
+            .Single(item => item.Id == firstCategoryId);
         category.Id.Should().Be(firstCategoryId);
         category.ActionItems.Should().ContainSingle();
         CategorizedActionItemResponse actionItem = category.ActionItems.Single();
@@ -121,15 +194,52 @@ public sealed class GetCategoriesWithActionItemsQueryHandlerTests
         result.Value.TotalCount.Should().Be(2);
         result.Value.TotalPages.Should().Be(2);
         result.Value.HasNextPage.Should().BeTrue();
+        result.Value.Categories
+            .Where(item => item.Id != firstCategoryId)
+            .Should().OnlyContain(item => item.ActionItems.Count == 0);
 
         Result<CategoriesWithActionItemsResponse> secondPage = await handler.Handle(
             query with { PageNumber = 2 },
             CancellationToken.None);
 
-        secondPage.Value.Categories.Should().ContainSingle();
-        secondPage.Value.Categories.Single().Id.Should().Be(secondCategoryId);
-        secondPage.Value.Categories.Single().ActionItems.Single().ActionItemName
+        secondPage.Value.Categories.Should().HaveCount(3);
+        secondPage.Value.Categories
+            .Single(item => item.Id == secondCategoryId)
+            .ActionItems.Single().ActionItemName
             .Should().Be("Frontend implementation");
+    }
+
+    [Fact]
+    public async Task Handle_Should_ReturnOnlySelectedCategoryWithEmptyItems_WhenNoItemMatches()
+    {
+        // Arrange
+        await using var context = CreateDbContext();
+        (Guid userId, Guid projectId, Guid categoryId, _) =
+            await SeedProjectAsync(context);
+        var userContext = Substitute.For<IUserContext>();
+        userContext.IsAuthenticated.Returns(true);
+        userContext.UserId.Returns(userId);
+        var dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(new DateTime(2026, 8, 20));
+        var handler = new GetCategoriesWithActionItemsQueryHandler(
+            context,
+            userContext,
+            dateTimeProvider);
+
+        // Act
+        Result<CategoriesWithActionItemsResponse> result = await handler.Handle(
+            new GetCategoriesWithActionItemsQuery(
+                projectId,
+                CategoryId: categoryId,
+                Priority: (int)Priority.Critical),
+            CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Categories.Should().ContainSingle();
+        result.Value.Categories.Single().Id.Should().Be(categoryId);
+        result.Value.Categories.Single().ActionItems.Should().BeEmpty();
+        result.Value.TotalCount.Should().Be(0);
     }
 
     [Fact]
@@ -176,6 +286,7 @@ public sealed class GetCategoriesWithActionItemsQueryHandlerTests
         Guid projectId = Guid.NewGuid();
         Guid discoveryId = Guid.NewGuid();
         Guid developmentId = Guid.NewGuid();
+        Guid launchId = Guid.NewGuid();
         Guid researchId = Guid.NewGuid();
 
         context.Projects.Add(new Project
@@ -207,6 +318,13 @@ public sealed class GetCategoriesWithActionItemsQueryHandlerTests
                 ProjectId = projectId,
                 Name = "Development",
                 DisplayOrder = 2
+            },
+            new Category
+            {
+                Id = launchId,
+                ProjectId = projectId,
+                Name = "Launch",
+                DisplayOrder = 3
             });
         context.SubCategories.Add(new SubCategory
         {

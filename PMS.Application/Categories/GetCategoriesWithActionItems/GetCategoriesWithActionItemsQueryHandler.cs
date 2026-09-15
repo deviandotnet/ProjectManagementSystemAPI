@@ -97,6 +97,27 @@ internal sealed class GetCategoriesWithActionItemsQueryHandler(
         int pageSize,
         CancellationToken cancellationToken)
     {
+        var categoryQuery = context.Categories
+            .AsNoTracking()
+            .Where(category => category.ProjectId == query.ProjectId);
+
+        if (query.CategoryId.HasValue)
+        {
+            categoryQuery = categoryQuery.Where(
+                category => category.Id == query.CategoryId.Value);
+        }
+
+        List<CategoryReadModel> categoryRows = await categoryQuery
+            .OrderBy(category => category.DisplayOrder)
+            .ThenBy(category => category.Id)
+            .Select(category => new CategoryReadModel(
+                category.Id,
+                category.ProjectId,
+                category.Name,
+                category.DisplayOrder,
+                category.Color))
+            .ToListAsync(cancellationToken);
+
         var dbQuery =
             from actionItem in context.ActionItems.AsNoTracking()
             join category in context.Categories.AsNoTracking()
@@ -275,22 +296,19 @@ internal sealed class GetCategoriesWithActionItemsQueryHandler(
                 item.ActionItem.Remarks))
             .ToListAsync(cancellationToken);
 
-        List<CategoryWithActionItemsResponse> categories = rawItems
-            .GroupBy(item => new
-            {
-                item.CategoryId,
-                item.ProjectId,
-                item.CategoryName,
-                item.CategoryDisplayOrder,
-                item.CategoryColor
-            })
-            .Select(group => new CategoryWithActionItemsResponse(
-                group.Key.CategoryId,
-                group.Key.ProjectId,
-                group.Key.CategoryName,
-                group.Key.CategoryDisplayOrder,
-                group.Key.CategoryColor,
-                group.Select(item => MapActionItem(item, today)).ToList()))
+        ILookup<Guid, CategorizedActionItemReadModel> itemsByCategory =
+            rawItems.ToLookup(item => item.CategoryId);
+
+        List<CategoryWithActionItemsResponse> categories = categoryRows
+            .Select(category => new CategoryWithActionItemsResponse(
+                category.Id,
+                category.ProjectId,
+                category.Name,
+                category.DisplayOrder,
+                category.Color,
+                itemsByCategory[category.Id]
+                    .Select(item => MapActionItem(item, today))
+                    .ToList()))
             .ToList();
 
         int totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
@@ -304,6 +322,13 @@ internal sealed class GetCategoriesWithActionItemsQueryHandler(
             pageNumber > 1,
             pageNumber < totalPages);
     }
+
+    private sealed record CategoryReadModel(
+        Guid Id,
+        Guid ProjectId,
+        string Name,
+        int DisplayOrder,
+        string? Color);
 
     private static CategorizedActionItemResponse MapActionItem(
         CategorizedActionItemReadModel item,

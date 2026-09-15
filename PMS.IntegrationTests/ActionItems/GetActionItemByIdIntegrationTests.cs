@@ -114,9 +114,11 @@ public class GetActionItemByIdIntegrationTests : IClassFixture<WebApplicationFac
         item.Should().NotBeNull();
         item!.Id.Should().Be(actionItemId);
         item.ActionItemName.Should().Be("Integration Action Item");
+        item.Description.Should().Be("Integration Action Item description");
         item.CategoryName.Should().Be("Integration Category");
         item.Priority.Should().Be((int)Priority.High);
         item.OwnerName.Should().Be("Integration Owner");
+        item.OwnerId.Should().Be(user.Id);
         item.Sequence.Should().Be(4);
         item.PlannedSchedule.Should().NotBeNull();
         item.PlannedSchedule!.PlannedEndDate.Should().Be(new DateOnly(2026, 1, 10));
@@ -145,6 +147,8 @@ public class GetActionItemByIdIntegrationTests : IClassFixture<WebApplicationFac
         item.Should().NotBeNull();
         item!.SubCategoryId.Should().BeNull();
         item.SubCategoryName.Should().BeNull();
+        item.Description.Should().BeNull();
+        item.OwnerId.Should().BeNull();
         item.PlannedSchedule.Should().BeNull();
         item.ActualExecution.Should().BeNull();
         item.ComputedStatus.Should().Be((int)ActionItemStatus.Plan);
@@ -213,8 +217,10 @@ public class GetActionItemByIdIntegrationTests : IClassFixture<WebApplicationFac
             ProjectId = projectId,
             CategoryId = categoryId,
             ActionItemName = "Integration Action Item",
+            Description = includeDetails ? "Integration Action Item description" : null,
             Priority = Priority.High,
             OwnerName = "Integration Owner",
+            OwnerId = includeDetails ? userId : null,
             Sequence = 4,
             Weight = 40m,
             Remarks = "Integration remarks"

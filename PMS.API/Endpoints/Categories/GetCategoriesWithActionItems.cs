@@ -59,7 +59,7 @@ internal sealed class GetCategoriesWithActionItems : IApiEndpoint
         })
         .RequireAuthorization()
         .WithSummary("List Categories With Action Items")
-        .WithDescription("Retrieves action items grouped by category for a project. Pagination counts action items, and all action-item filters are supported.")
+        .WithDescription("Retrieves every applicable project category with its matching page of action items. Empty categories contain an empty actionItems collection. Pagination counts action items, and all action-item filters are supported.")
         .WithTags(Tags.Categories, Tags.ActionItems);
     }
 }

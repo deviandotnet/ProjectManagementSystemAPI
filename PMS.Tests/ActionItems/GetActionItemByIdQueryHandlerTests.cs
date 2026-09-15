@@ -120,6 +120,7 @@ public class GetActionItemByIdQueryHandlerTests
         var actionItemId = Guid.NewGuid();
         var scheduleId = Guid.NewGuid();
         var executionId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
 
         context.Projects.Add(new Project
         {
@@ -142,7 +143,8 @@ public class GetActionItemByIdQueryHandlerTests
         {
             Id = actionItemId, ProjectId = projectId, CategoryId = categoryId,
             SubCategoryId = subCategoryId, ActionItemName = "Specific Task",
-            Priority = Priority.High, OwnerName = "Jane Owner", Sequence = 7,
+            Description = "Specific task description",
+            Priority = Priority.High, OwnerName = "Jane Owner", OwnerId = ownerId, Sequence = 7,
             Weight = 25.5m, Remarks = "Projected remarks"
         });
         context.PlannedSchedules.Add(new PlannedSchedule
@@ -179,12 +181,14 @@ public class GetActionItemByIdQueryHandlerTests
         result.Value.Should().NotBeNull();
         result.Value.Id.Should().Be(actionItemId);
         result.Value.ActionItemName.Should().Be("Specific Task");
+        result.Value.Description.Should().Be("Specific task description");
         result.Value.CategoryId.Should().Be(categoryId);
         result.Value.CategoryName.Should().Be("Category 1");
         result.Value.SubCategoryId.Should().Be(subCategoryId);
         result.Value.SubCategoryName.Should().Be("Subcategory 1");
         result.Value.Priority.Should().Be((int)Priority.High);
         result.Value.OwnerName.Should().Be("Jane Owner");
+        result.Value.OwnerId.Should().Be(ownerId);
         result.Value.Sequence.Should().Be(7);
         result.Value.PlannedSchedule.Should().NotBeNull();
         result.Value.PlannedSchedule!.Id.Should().Be(scheduleId);
@@ -224,6 +228,8 @@ public class GetActionItemByIdQueryHandlerTests
         result.Value.ActualExecution.Should().BeNull();
         result.Value.SubCategoryId.Should().BeNull();
         result.Value.SubCategoryName.Should().BeNull();
+        result.Value.Description.Should().BeNull();
+        result.Value.OwnerId.Should().BeNull();
         result.Value.ComputedStatus.Should().Be((int)ActionItemStatus.Plan);
     }
 

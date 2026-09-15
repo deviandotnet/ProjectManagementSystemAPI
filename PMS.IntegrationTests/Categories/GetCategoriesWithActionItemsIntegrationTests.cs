@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PMS.API;
+using PMS.Application.Abstractions;
 using PMS.Application.Abstractions.Authentication;
+using PMS.Application.Categories.GetCategoriesByProjectId;
 using PMS.Application.Categories.GetCategoriesWithActionItems;
 using PMS.Domain.ActionItems;
 using PMS.Domain.Categories;
@@ -68,6 +70,80 @@ public sealed class GetCategoriesWithActionItemsIntegrationTests
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetCategoriesWithActionItems_Should_ReturnCategories_WhenNoActionItemsExist()
+    {
+        // Arrange
+        (User user, HttpClient client) = await CreateAuthenticatedClientAsync();
+        Guid projectId = Guid.NewGuid();
+        using (IServiceScope scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.Projects.Add(new Project
+            {
+                Id = projectId,
+                Name = "Food Listing Idea",
+                StartDate = new DateOnly(2026, 9, 16),
+                EndDate = new DateOnly(2026, 9, 25),
+                CreatedByUserId = user.Id
+            });
+            context.ProjectMembers.Add(new ProjectMember
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = projectId,
+                UserId = user.Id,
+                Role = UserRole.Member
+            });
+            context.Categories.AddRange(
+                new Category
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectId = projectId,
+                    Name = "Category 2",
+                    DisplayOrder = 2
+                },
+                new Category
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectId = projectId,
+                    Name = "Category 1",
+                    DisplayOrder = 1
+                },
+                new Category
+                {
+                    Id = Guid.NewGuid(),
+                    ProjectId = projectId,
+                    Name = "Category 3",
+                    DisplayOrder = 3
+                });
+            await context.SaveChangesAsync();
+        }
+
+        // Act
+        HttpResponseMessage categoryResponse = await client.GetAsync(
+            $"api/projects/{projectId}/categories");
+        HttpResponseMessage groupedResponse = await client.GetAsync(
+            $"api/projects/{projectId}/categories/action-items");
+
+        // Assert
+        categoryResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        groupedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        PagedResponse<CategoryResponse>? categoryPage =
+            await categoryResponse.Content.ReadFromJsonAsync<PagedResponse<CategoryResponse>>();
+        CategoriesWithActionItemsResponse? groupedPage =
+            await groupedResponse.Content
+                .ReadFromJsonAsync<CategoriesWithActionItemsResponse>();
+        categoryPage.Should().NotBeNull();
+        groupedPage.Should().NotBeNull();
+        categoryPage!.TotalCount.Should().Be(3);
+        groupedPage!.Categories.Select(category => category.Name)
+            .Should().Equal("Category 1", "Category 2", "Category 3");
+        groupedPage.Categories.Should().OnlyContain(
+            category => category.ActionItems.Count == 0);
+        groupedPage.TotalCount.Should().Be(0);
+        groupedPage.TotalPages.Should().Be(0);
     }
 
     [Fact]
